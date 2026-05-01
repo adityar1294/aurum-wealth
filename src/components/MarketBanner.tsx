@@ -42,7 +42,7 @@ export default function MarketBanner() {
         return (
           <div key={sym} className="market-ticker">
             <span className="ticker-name">{LABELS[sym]}</span>
-            {q ? (
+            {q?.price ? (
               <>
                 <span className="ticker-price">
                   {sym.startsWith('^') ? q.price.toLocaleString('en-IN', { maximumFractionDigits: 0 }) : `₹${q.price.toFixed(2)}`}
