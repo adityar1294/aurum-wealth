@@ -85,6 +85,15 @@ export interface GlidePathBucket {
   goldPct: number;
 }
 
+export interface LoanEntry {
+  id: string;
+  name: string;
+  outstandingBalance: number;
+  interestRate: number;
+  remainingTenureMonths: number;
+  emiOverride: number;
+}
+
 export interface PlannerState {
   // Basic Info
   currentAge: number;
@@ -102,6 +111,7 @@ export interface PlannerState {
   assets: AdditionalAsset[];
   goals: FinancialGoal[];
   sipEffects: SIPEffect[];
+  loans: LoanEntry[];
   params: InstrumentParams;
 
   // Advanced
@@ -146,6 +156,7 @@ export const DEFAULT_STATE: PlannerState = {
   assets: [],
   goals: [],
   sipEffects: [],
+  loans: [],
   params: RISK_DEFAULTS.moderate,
   glidePathEnabled: false,
   glidePath: [],

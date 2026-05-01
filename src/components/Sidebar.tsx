@@ -52,13 +52,32 @@ export default function Sidebar() {
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href);
 
+  const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
+
   return (
     <div className="sidebar">
+      {/* Brand */}
       <div className="sidebar-brand">
-        <div className="brand-name">Aurum Wealth</div>
-        <div className="brand-tagline">Wealth Management</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'var(--ink)', color: 'var(--yolk)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 22,
+              flexShrink: 0, lineHeight: 1,
+            }}
+          >
+            A
+          </div>
+          <div>
+            <div className="brand-name">Aurum</div>
+            <div className="brand-tagline">Wealth Management</div>
+          </div>
+        </div>
       </div>
 
+      {/* Nav */}
       <nav className="sidebar-nav">
         <div className="nav-section-title">Main</div>
         {NAV.map((item) => (
@@ -101,17 +120,20 @@ export default function Sidebar() {
         )}
       </nav>
 
+      {/* Footer: user card + sign out */}
       <div className="sidebar-footer">
         <div className="user-info">
-          <div className="user-avatar">
-            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-          </div>
-          <div style={{ overflow: 'hidden', flex: 1 }}>
+          <div className="user-avatar">{initials}</div>
+          <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
             <div className="user-name">{user?.name || user?.email}</div>
             <div className="user-role">{user?.role?.toUpperCase()}</div>
           </div>
         </div>
-        <button className="nav-item" style={{ width: '100%', background: 'none', border: 'none' }} onClick={handleSignOut}>
+        <button
+          className="nav-item"
+          style={{ width: '100%', background: 'none', border: 'none', marginTop: 4 }}
+          onClick={handleSignOut}
+        >
           <LogOut size={16} />
           Sign Out
         </button>

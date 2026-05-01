@@ -63,7 +63,24 @@ export default function PortfolioTab({ clientId }: Props) {
   const tickerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // AMFI lookup state
+  const [amfiSearching, setAmfiSearching] = useState(false);
+  const amfiTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stable ref so the 30s interval always calls the latest refreshPrices
+  const refreshFnRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const holdingsRef = useRef<Holding[]>([]);
+  holdingsRef.current = holdings;
+
   useEffect(() => { loadHoldings(); }, [clientId]);
+
+  // 30s periodic price refresh
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (refreshFnRef.current) refreshFnRef.current();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Close ticker dropdown on outside click
   useEffect(() => {
@@ -98,14 +115,16 @@ export default function PortfolioTab({ clientId }: Props) {
     finally { setLoading(false); }
   };
 
-  const refreshPrices = async () => {
+  const refreshPrices = useCallback(async () => {
     const db = getClientDb();
+    const currentHoldings = holdingsRef.current;
+    if (!currentHoldings.length) return;
     setRefreshing(true);
     try {
-      const equityHoldings = holdings.filter(
+      const equityHoldings = currentHoldings.filter(
         (h) => h.symbol && ['equity_india', 'equity_global', 'etf_india', 'etf_global'].includes(h.assetType)
       );
-      const mfHoldings = holdings.filter((h) => h.amfiCode && h.assetType.includes('mutual_fund'));
+      const mfHoldings = currentHoldings.filter((h) => h.amfiCode && h.assetType.includes('mutual_fund'));
 
       if (equityHoldings.length) {
         const symbols = equityHoldings.map((h) => h.symbol!).join(',');
@@ -141,7 +160,10 @@ export default function PortfolioTab({ clientId }: Props) {
       await loadHoldings();
     } catch (err) { console.error(err); }
     finally { setRefreshing(false); }
-  };
+  }, []);
+
+  // Keep the ref up to date so the interval always calls the latest version
+  refreshFnRef.current = refreshPrices;
 
   // Ticker search with debounce
   const searchTicker = useCallback((q: string) => {
@@ -159,6 +181,29 @@ export default function PortfolioTab({ clientId }: Props) {
     }, 300);
   }, []);
 
+  // AMFI code lookup with debounce — fills name and switches asset type to MF India
+  const lookupAmfi = useCallback((code: string) => {
+    if (amfiTimeout.current) clearTimeout(amfiTimeout.current);
+    if (code.length < 4) return;
+    setAmfiSearching(true);
+    amfiTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/mf-nav?codes=${encodeURIComponent(code)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const entry = data[code];
+        if (entry?.name) {
+          setHoldingForm((f) => ({
+            ...f,
+            name: f.name || entry.name,
+            assetType: 'mutual_fund_india',
+          }));
+        }
+      } catch {}
+      finally { setAmfiSearching(false); }
+    }, 500);
+  }, []);
+
   const selectTicker = (t: TickerResult) => {
     const assetType = guessAssetType(t.type, t.exchange);
     setHoldingForm((f) => ({
@@ -174,8 +219,34 @@ export default function PortfolioTab({ clientId }: Props) {
     setShowTickerDropdown(false);
   };
 
+  // Smart field update: auto-derive third field from the triangle units × avgCostPrice = investedAmount
+  const hf = (field: keyof typeof holdingForm, value: string) => {
+    setHoldingForm((f) => {
+      const next = { ...f, [field]: value };
+      const u = parseFloat(next.units);
+      const p = parseFloat(next.avgCostPrice);
+      const inv = parseFloat(next.investedAmount);
+
+      if (field === 'units' || field === 'avgCostPrice') {
+        if (!isNaN(u) && !isNaN(p) && u > 0 && p > 0) {
+          next.investedAmount = (u * p).toFixed(2);
+        }
+      } else if (field === 'investedAmount') {
+        if (!isNaN(inv) && !isNaN(u) && u > 0 && inv > 0) {
+          next.avgCostPrice = (inv / u).toFixed(4);
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const tf = (field: keyof typeof txForm, value: string) =>
+    setTxForm((f) => ({ ...f, [field]: value }));
+
   const saveHolding = async () => {
     const db = getClientDb();
+    const isNew = !editingHolding;
     const data = {
       clientId,
       assetType: holdingForm.assetType,
@@ -199,7 +270,9 @@ export default function PortfolioTab({ clientId }: Props) {
       await addDoc(collection(db, 'holdings'), { ...data, createdAt: serverTimestamp() });
     }
     setShowHoldingModal(false);
-    loadHoldings();
+    await loadHoldings();
+    // Refresh prices immediately after adding a new security
+    if (isNew) refreshPrices();
   };
 
   const deleteHolding = async (id: string) => {
@@ -279,11 +352,6 @@ export default function PortfolioTab({ clientId }: Props) {
     });
     setShowTxModal(true);
   };
-
-  const hf = (field: keyof typeof holdingForm, value: string) =>
-    setHoldingForm((f) => ({ ...f, [field]: value }));
-  const tf = (field: keyof typeof txForm, value: string) =>
-    setTxForm((f) => ({ ...f, [field]: value }));
 
   const totalInvested = holdings.reduce((s, h) => s + (h.investedAmount || 0), 0);
   const totalCurrent = holdings.reduce((s, h) => s + (h.currentValue || h.investedAmount || 0), 0);
@@ -635,8 +703,18 @@ export default function PortfolioTab({ clientId }: Props) {
                   <input className="input" value={holdingForm.isin} onChange={(e) => hf('isin', e.target.value)} placeholder="INE002A01018" />
                 </div>
                 <div className="field">
-                  <label className="label">AMFI Code (Mutual Funds)</label>
-                  <input className="input" value={holdingForm.amfiCode} onChange={(e) => hf('amfiCode', e.target.value)} placeholder="120503" />
+                  <label className="label">AMFI Code
+                    {amfiSearching && <span className="spinner spinner-sm" style={{ marginLeft: 8 }} />}
+                  </label>
+                  <input
+                    className="input"
+                    value={holdingForm.amfiCode}
+                    placeholder="e.g. 120503 — auto-fills name"
+                    onChange={(e) => {
+                      hf('amfiCode', e.target.value);
+                      lookupAmfi(e.target.value.trim());
+                    }}
+                  />
                 </div>
                 <div className="field">
                   <label className="label">Currency</label>
@@ -646,18 +724,25 @@ export default function PortfolioTab({ clientId }: Props) {
                     <option value="EUR">EUR €</option>
                   </select>
                 </div>
+
+                {/* Triangle: units × avgCostPrice = investedAmount (any two fills the third) */}
                 <div className="field">
                   <label className="label">Units / Quantity</label>
                   <input className="input" type="number" value={holdingForm.units} onChange={(e) => hf('units', e.target.value)} placeholder="0" />
                 </div>
                 <div className="field">
-                  <label className="label">Avg Purchase Price (₹)</label>
-                  <input className="input" type="number" value={holdingForm.avgCostPrice} onChange={(e) => hf('avgCostPrice', e.target.value)} placeholder="0.00" />
+                  <label className="label">Avg Purchase Price (₹)
+                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>auto-calculated</span>
+                  </label>
+                  <input className="input" type="number" value={holdingForm.avgCostPrice} onChange={(e) => hf('avgCostPrice', e.target.value)} placeholder="derived from invested ÷ units" />
                 </div>
-                <div className="field">
-                  <label className="label">Total Invested (₹)</label>
-                  <input className="input" type="number" value={holdingForm.investedAmount} onChange={(e) => hf('investedAmount', e.target.value)} placeholder="0.00" />
+                <div className="field" style={{ gridColumn: '1/-1' }}>
+                  <label className="label">Total Invested (₹)
+                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 4 }}>auto-calculated</span>
+                  </label>
+                  <input className="input" type="number" value={holdingForm.investedAmount} onChange={(e) => hf('investedAmount', e.target.value)} placeholder="derived from units × avg price" />
                 </div>
+
                 <div className="field">
                   <label className="label">Maturity Date</label>
                   <input className="input" type="date" value={holdingForm.maturityDate} onChange={(e) => hf('maturityDate', e.target.value)} />
