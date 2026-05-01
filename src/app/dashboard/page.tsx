@@ -1,59 +1,159 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import {
   collection,
   query,
   where,
   getDocs,
-  orderBy,
-  limit,
   Timestamp,
 } from 'firebase/firestore';
-import { getClientDb } from '@/lib/firebase';
-import { useAuth } from '@/hooks/useAuth';
-import AppShell from '@/components/AppShell';
-import { Users, CheckSquare, AlertCircle, MessageSquare } from 'lucide-react';
-import { formatINR } from '@/lib/currency';
+import {
+  ArrowUpRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Plus,
+  Trophy,
+} from 'lucide-react';
 import Link from 'next/link';
+import AppShell from '@/components/AppShell';
+import { useAuth } from '@/hooks/useAuth';
+import { getClientDb } from '@/lib/firebase';
+import { formatINR } from '@/lib/currency';
+import { decrypt } from '@/lib/encryption';
 
-interface Stats {
-  totalClients: number;
-  pendingTasks: number;
-  overdueTasks: number;
-  recentInteractions: number;
+interface DashboardClient {
+  id: string;
+  name: string;
+  family: string;
+  riskProfile: string;
+  birthday?: Date;
+  currentValue: number;
+  investedAmount: number;
 }
 
-interface TaskItem {
+interface DashboardTask {
   id: string;
   title: string;
   priority: string;
+  status: string;
   dueDate: Date;
+  completedAt?: Date;
+  clientId?: string;
   clientName?: string;
 }
 
-interface InteractionItem {
+interface DashboardEvent {
   id: string;
-  subject: string;
-  type: string;
+  title: string;
+  type: 'task' | 'meeting' | 'event' | 'follow_up';
   date: Date;
   clientName?: string;
 }
 
-interface ClientItem {
-  id: string;
-  name: string;
-  email: string;
-  riskProfile: string;
-  tags: string[];
-  createdAt: Date;
+interface RiskFlag {
+  tone: 'gold' | 'red' | 'blue';
+  label: string;
+  detail: string;
+}
+
+const AUM_TARGET = 365_00_00_000;
+const REVIEW_TARGET_RATIO = 0.62;
+const TOUCHPOINT_TARGET = 15;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const RISK_STYLE: Record<string, string> = {
+  conservative: 'client-card-dark',
+  moderate: 'client-card-blue',
+  aggressive: 'client-card-green',
+  very_aggressive: 'client-card-yellow',
+};
+
+const toDate = (value: unknown, fallback = new Date()) => {
+  if (!value) return fallback;
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp) return value.toDate();
+  if (typeof value === 'object' && value && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  const parsed = new Date(value as string);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+};
+
+const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const pct = (value: number, total: number) => Math.max(0, Math.min(100, total ? Math.round((value / total) * 100) : 0));
+const cr = (value: number) => `${(value / 1_00_00_000).toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr`;
+
+function ProgressRing({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="goal-ring" style={{ '--ring-value': `${value * 3.6}deg`, '--ring-color': color } as CSSProperties}>
+      <span>{value}%</span>
+    </div>
+  );
+}
+
+function CalendarCard({ events }: { events: DashboardEvent[] }) {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const offset = monthStart.getDay();
+  const byDay = useMemo(() => {
+    const map: Record<string, DashboardEvent[]> = {};
+    events.forEach((event) => {
+      const key = dayKey(event.date);
+      map[key] = [...(map[key] || []), event];
+    });
+    return map;
+  }, [events]);
+  const todayEvents = byDay[dayKey(today)] || [];
+
+  return (
+    <div className="dashboard-panel calendar-panel">
+      <div className="dashboard-card-head">
+        <div className="flex-center gap-8">
+          <h2>May</h2>
+          <span>{todayEvents.length} item{todayEvents.length !== 1 ? 's' : ''} today</span>
+        </div>
+        <div className="flex-center gap-8">
+          <button className="dash-icon-button" type="button" aria-label="Previous month"><ChevronLeft size={14} /></button>
+          <button className="dash-icon-button" type="button" aria-label="Next month"><ChevronRight size={14} /></button>
+        </div>
+      </div>
+      <div className="calendar-legend" aria-label="Calendar color logic">
+        <span><i className="legend-dot calm" /> light</span>
+        <span><i className="legend-dot steady" /> steady</span>
+        <span><i className="legend-dot busy" /> hectic</span>
+      </div>
+      <div className="calendar-grid calendar-weekdays">
+        {WEEKDAYS.map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
+      </div>
+      <div className="calendar-grid">
+        {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const date = new Date(today.getFullYear(), today.getMonth(), i + 1);
+          const count = (byDay[dayKey(date)] || []).length;
+          const isToday = i + 1 === today.getDate();
+          const mood = count >= 4 ? 'hectic' : count >= 2 ? 'steady' : count === 1 ? 'calm' : '';
+          return (
+            <div key={i + 1} className={`calendar-day ${mood} ${isToday ? 'today' : ''}`} title={`${count} event${count !== 1 ? 's' : ''}`}>
+              <span>{i + 1}</span>
+              {count > 0 && <b />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<Stats>({ totalClients: 0, pendingTasks: 0, overdueTasks: 0, recentInteractions: 0 });
-  const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
-  const [recentInteractions, setRecentInteractions] = useState<InteractionItem[]>([]);
-  const [recentClients, setRecentClients] = useState<ClientItem[]>([]);
+  const [clients, setClients] = useState<DashboardClient[]>([]);
+  const [tasks, setTasks] = useState<DashboardTask[]>([]);
+  const [events, setEvents] = useState<DashboardEvent[]>([]);
+  const [interactionsCount, setInteractionsCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,91 +164,121 @@ export default function DashboardPage() {
   const loadDashboard = async () => {
     const db = getClientDb();
     if (!user) return;
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
+    setLoading(true);
     try {
-      const clientsQ = user.role === 'admin'
-        ? query(collection(db, 'clients'))
-        : query(collection(db, 'clients'), where('rmId', '==', user.uid));
+      const now = new Date();
+      const clientQ = user.role === 'client' && user.clientId
+        ? query(collection(db, 'clients'), where('__name__', '==', user.clientId))
+        : user.role === 'admin'
+          ? query(collection(db, 'clients'))
+          : query(collection(db, 'clients'), where('rmId', '==', user.uid));
 
-      const [clientsSnap, tasksSnap, interactionsSnap] = await Promise.all([
-        getDocs(clientsQ),
+      const clientsSnap = await getDocs(clientQ);
+      const rawClients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown> & { id: string }>;
+      const clientIds = new Set(rawClients.map((client) => client.id));
+      const clientNames: Record<string, string> = {};
+
+      rawClients.forEach((client) => {
+        const pi = (client.personalInfo || {}) as Record<string, string>;
+        clientNames[client.id] = `${pi.firstName || ''} ${pi.lastName || ''}`.trim() || 'Unnamed client';
+      });
+
+      const holdingsByClient: Record<string, { currentValue: number; investedAmount: number }> = {};
+      await Promise.all(rawClients.map(async (client) => {
+        const snap = await getDocs(query(collection(db, 'holdings'), where('clientId', '==', client.id)));
+        holdingsByClient[client.id] = snap.docs.reduce((acc, docSnap) => {
+          const data = docSnap.data();
+          const investedAmount = Number(data.investedAmount || 0);
+          return {
+            currentValue: acc.currentValue + Number(data.currentValue || investedAmount || 0),
+            investedAmount: acc.investedAmount + investedAmount,
+          };
+        }, { currentValue: 0, investedAmount: 0 });
+      }));
+
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+      const [tasksSnap, interactionsSnap] = await Promise.all([
         getDocs(
-          user.role === 'admin'
-            ? query(collection(db, 'tasks'), where('status', 'in', ['pending', 'in_progress']))
-            : query(collection(db, 'tasks'), where('rmId', '==', user.uid), where('status', 'in', ['pending', 'in_progress']))
+          user.role === 'client' && user.clientId
+            ? query(collection(db, 'tasks'), where('clientId', '==', user.clientId))
+            : user.role === 'admin'
+              ? query(collection(db, 'tasks'))
+              : query(collection(db, 'tasks'), where('rmId', '==', user.uid))
         ),
         getDocs(
-          user.role === 'admin'
-            ? query(collection(db, 'interactions'), where('date', '>=', Timestamp.fromDate(thirtyDaysAgo)))
-            : query(collection(db, 'interactions'), where('rmId', '==', user.uid), where('date', '>=', Timestamp.fromDate(thirtyDaysAgo)))
+          user.role === 'client' && user.clientId
+            ? query(collection(db, 'interactions'), where('clientId', '==', user.clientId), where('date', '>=', Timestamp.fromDate(thirtyDaysAgo)))
+            : user.role === 'admin'
+              ? query(collection(db, 'interactions'), where('date', '>=', Timestamp.fromDate(thirtyDaysAgo)))
+              : query(collection(db, 'interactions'), where('rmId', '==', user.uid), where('date', '>=', Timestamp.fromDate(thirtyDaysAgo)))
         ),
       ]);
 
-      const clients = clientsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<Record<string, unknown> & { id: string }>;
-      const clientMap: Record<string, string> = {};
-      clients.forEach((c) => {
-        const pi = c.personalInfo as Record<string, string> | undefined;
-        clientMap[c.id] = pi ? `${pi.firstName || ''} ${pi.lastName || ''}`.trim() : c.id;
+      const taskItems = tasksSnap.docs
+        .map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            title: data.title || 'Untitled task',
+            priority: data.priority || 'medium',
+            status: data.status || 'pending',
+            dueDate: toDate(data.dueDate),
+            completedAt: data.completedAt ? toDate(data.completedAt) : undefined,
+            clientId: data.clientId,
+            clientName: data.clientId ? clientNames[data.clientId] : undefined,
+          };
+        })
+        .filter((task) => !task.clientId || clientIds.has(task.clientId) || user.role !== 'client');
+
+      const calendarEvents: DashboardEvent[] = taskItems
+        .filter((task) => task.status !== 'completed' && task.status !== 'cancelled')
+        .map((task) => ({
+          id: `task-${task.id}`,
+          title: task.title,
+          type: 'task',
+          date: task.dueDate,
+          clientName: task.clientName,
+        }));
+
+      const interactionEvents: DashboardEvent[] = [];
+      interactionsSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.clientId && !clientIds.has(data.clientId) && user.role === 'client') return;
+        const type = data.type === 'meeting' || data.type === 'review' ? 'meeting' : 'event';
+        interactionEvents.push({
+          id: `interaction-${docSnap.id}`,
+          title: data.subject || data.type || 'Interaction',
+          type,
+          date: toDate(data.date),
+          clientName: data.clientId ? clientNames[data.clientId] : undefined,
+        });
+        if (data.followUpDate) {
+          interactionEvents.push({
+            id: `follow-${docSnap.id}`,
+            title: data.followUpNote || `Follow up: ${data.subject || 'client'}`,
+            type: 'follow_up',
+            date: toDate(data.followUpDate),
+            clientName: data.clientId ? clientNames[data.clientId] : undefined,
+          });
+        }
       });
 
-      const tasks = tasksSnap.docs.map((d) => {
-        const data = d.data();
-        const dueDate = data.dueDate?.toDate?.() || new Date(data.dueDate);
+      setClients(rawClients.map((client) => {
+        const pi = (client.personalInfo || {}) as Record<string, string>;
+        const values = holdingsByClient[client.id] || { currentValue: 0, investedAmount: 0 };
         return {
-          id: d.id,
-          title: data.title,
-          priority: data.priority,
-          dueDate,
-          clientName: data.clientId ? clientMap[data.clientId] : undefined,
+          id: client.id,
+          name: clientNames[client.id],
+          family: pi.lastName ? `${pi.lastName} family` : 'Client household',
+          riskProfile: (client.riskProfile as string) || 'moderate',
+          birthday: pi.dateOfBirth ? toDate(decrypt(pi.dateOfBirth), undefined as unknown as Date) : undefined,
+          currentValue: values.currentValue,
+          investedAmount: values.investedAmount,
         };
-      });
-
-      const overdueCount = tasks.filter((t) => t.dueDate < now).length;
-
-      setPendingTasks(tasks.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()).slice(0, 5));
-
-      const interactions = interactionsSnap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          subject: data.subject,
-          type: data.type,
-          date: data.date?.toDate?.() || new Date(data.date),
-          clientName: data.clientId ? clientMap[data.clientId] : undefined,
-        };
-      });
-
-      setRecentInteractions(interactions.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5));
-
-      setRecentClients(
-        clients
-          .sort((a, b) => {
-            const aDate = (a.createdAt as Timestamp)?.toDate?.()?.getTime() || 0;
-            const bDate = (b.createdAt as Timestamp)?.toDate?.()?.getTime() || 0;
-            return bDate - aDate;
-          })
-          .slice(0, 5)
-          .map((c) => {
-            const pi = c.personalInfo as Record<string, string> | undefined;
-            return {
-              id: c.id,
-              name: pi ? `${pi.firstName || ''} ${pi.lastName || ''}`.trim() : 'Unknown',
-              email: pi?.email || '',
-              riskProfile: (c.riskProfile as string) || 'moderate',
-              tags: (c.tags as string[]) || [],
-              createdAt: (c.createdAt as Timestamp)?.toDate?.() || new Date(),
-            };
-          })
-      );
-
-      setStats({
-        totalClients: clients.length,
-        pendingTasks: tasks.length,
-        overdueTasks: overdueCount,
-        recentInteractions: interactions.length,
-      });
+      }));
+      setTasks(taskItems);
+      setEvents([...calendarEvents, ...interactionEvents]);
+      setInteractionsCount(interactionsSnap.size);
     } catch (err) {
       console.error(err);
     } finally {
@@ -156,165 +286,229 @@ export default function DashboardPage() {
     }
   };
 
-  const riskBadge = (r: string) => {
-    const map: Record<string, string> = {
-      very_conservative: 'badge-blue', conservative: 'badge-green',
-      moderate: 'badge-blue', aggressive: 'badge-yellow', very_aggressive: 'badge-red',
-    };
-    return map[r] || 'badge-gray';
-  };
+  const now = new Date();
+  const activeClients = clients.length;
+  const totalAum = clients.reduce((sum, client) => sum + client.currentValue, 0);
+  const invested = clients.reduce((sum, client) => sum + client.investedAmount, 0);
+  const gainPct = invested ? ((totalAum - invested) / invested) * 100 : 0;
+  const pendingTasks = tasks.filter((task) => task.status === 'pending' || task.status === 'in_progress');
+  const overdue = pendingTasks.filter((task) => task.dueDate < startOfDay(now)).length;
+  const todayTasks = pendingTasks.filter((task) => dayKey(task.dueDate) === dayKey(now)).length;
+  const topClients = [...clients].sort((a, b) => b.currentValue - a.currentValue).slice(0, 5);
+  const nextTasks = pendingTasks
+    .filter((task) => task.dueDate <= new Date(now.getTime() + 7 * 86400000))
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+    .slice(0, 4);
+  const meetingsThisMonth = events.filter((event) => event.type === 'meeting' && event.date.getMonth() === now.getMonth()).length;
+  const pipeline = clients.filter((client) => client.currentValue === 0).length * 10_00_00_000;
+  const reviewTarget = Math.max(1, Math.ceil(activeClients * REVIEW_TARGET_RATIO));
+  const reviewsDone = events.filter((event) => event.type === 'meeting' && event.date >= new Date(now.getFullYear(), now.getMonth(), 1)).length;
+  const touchpoints = interactionsCount;
+  const clientGoalTarget = Math.max(AUM_TARGET, totalAum || AUM_TARGET);
+  const goalsTitle = user?.role === 'client' ? 'Your goals' : 'Your achievements';
+  const rankLabel = user?.role === 'client' ? 'On track' : user?.role === 'admin' ? 'Admin view' : 'Top RM';
+  const goalMetrics = user?.role === 'client'
+    ? [
+        { label: 'Portfolio goal', sub: `${cr(totalAum)} / ${cr(clientGoalTarget)}`, value: pct(totalAum, clientGoalTarget), color: '#f0c84a' },
+        { label: 'Reviews done', sub: `${reviewsDone} this month`, value: pct(reviewsDone, Math.max(1, reviewsDone + pendingTasks.length)), color: '#3b5cf2' },
+        { label: 'Open actions', sub: `${pendingTasks.length} pending`, value: pct(Math.max(0, 10 - pendingTasks.length), 10), color: '#4ddc7b' },
+      ]
+    : [
+        { label: 'Q2 AUM target', sub: `${cr(totalAum)} / ${cr(AUM_TARGET)}`, value: pct(totalAum, AUM_TARGET), color: '#f0c84a' },
+        { label: 'Reviews done', sub: `${reviewsDone} / ${reviewTarget} clients`, value: pct(reviewsDone, reviewTarget), color: '#3b5cf2' },
+        { label: 'Touchpoints', sub: 'last 30 days', value: pct(touchpoints, TOUCHPOINT_TARGET), color: '#4ddc7b' },
+      ];
 
-  const priorityClass = (p: string) => `priority-${p}`;
+  const riskFlags: RiskFlag[] = [
+    ...clients
+      .filter((client) => client.riskProfile === 'aggressive' || client.riskProfile === 'very_aggressive')
+      .slice(0, 1)
+      .map((client) => ({ tone: 'gold' as const, label: `DRIFT · ${client.name.toUpperCase()}`, detail: 'Review aggressive allocation against mandate' })),
+    ...pendingTasks
+      .filter((task) => task.dueDate < now)
+      .slice(0, 1)
+      .map((task) => ({ tone: 'red' as const, label: `REVIEW · ${(task.clientName || 'CLIENT').toUpperCase()}`, detail: `${task.title} overdue` })),
+    ...clients
+      .filter((client) => client.currentValue > 0 && client.investedAmount > 0 && client.currentValue < client.investedAmount)
+      .slice(0, 1)
+      .map((client) => ({ tone: 'gold' as const, label: `VOLATILITY · ${client.name.toUpperCase()}`, detail: 'Portfolio value below invested amount' })),
+  ].slice(0, 3);
+
+  const personalTouchpoints = clients
+    .filter((client) => client.birthday && client.birthday.getMonth() === now.getMonth())
+    .slice(0, 3);
 
   return (
     <AppShell>
-      <div className="page">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-subtitle">Welcome back, {user?.name}</p>
-          </div>
-        </div>
-
+      <div className="page dashboard-page">
         {loading ? (
           <div className="loading-center"><div className="spinner spinner-lg" /></div>
         ) : (
           <>
-            <div className="grid-4">
-              <div className="metric-card">
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <Users size={18} />
-                </div>
-                <div className="metric-label">Total Clients</div>
-                <div className="metric-value">{stats.totalClients}</div>
+            <div className="dashboard-hero">
+              <div>
+                <div className="hero-date">{now.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })} · {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</div>
+                <h1>Good evening, {user?.name?.split(' ')[0] || 'there'}.</h1>
+                <p>here's your book today.</p>
               </div>
-              <div className="metric-card">
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-gold-dim)', color: 'var(--yolk-dk)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <CheckSquare size={18} />
-                </div>
-                <div className="metric-label">Pending Tasks</div>
-                <div className="metric-value">{stats.pendingTasks}</div>
-              </div>
-              <div className="metric-card">
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-red-dim)', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <AlertCircle size={18} />
-                </div>
-                <div className="metric-label">Overdue Tasks</div>
-                <div className="metric-value" style={{ color: stats.overdueTasks > 0 ? 'var(--accent-red)' : undefined }}>{stats.overdueTasks}</div>
-              </div>
-              <div className="metric-card">
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-green-dim)', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                  <MessageSquare size={18} />
-                </div>
-                <div className="metric-label">Interactions (30d)</div>
-                <div className="metric-value">{stats.recentInteractions}</div>
+              <div className="hero-actions">
+                {user?.role !== 'client' && <Link href="/clients/new" className="btn btn-primary"><Plus size={16} /> New client</Link>}
+                <Link href="/interactions" className="btn btn-secondary">Log interaction</Link>
               </div>
             </div>
 
-            <div className="grid-2 mt-24" style={{ marginTop: 20 }}>
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Pending Tasks</h2>
-                  <Link href="/tasks" className="btn btn-ghost btn-sm">View All</Link>
+            <div className="dashboard-metrics">
+              <div className="metric-feature metric-aum">
+                <span>Total AUM</span>
+                <strong>{formatINR(totalAum).replace('.00', '')}</strong>
+                <em>Cr</em>
+                <div className="metric-foot">
+                  <b className={gainPct >= 0 ? 'positive' : 'negative'}>{gainPct >= 0 ? '↑' : '↓'} {Math.abs(gainPct).toFixed(1)}%</b>
+                  <small>{formatINR(Math.abs(totalAum - invested)).replace('.00', '')} this month</small>
                 </div>
-                {pendingTasks.length === 0 ? (
-                  <div className="empty-state" style={{ padding: '24px' }}>
-                    <p>No pending tasks</p>
-                  </div>
-                ) : (
-                  <div>
-                    {pendingTasks.map((t) => (
-                      <div key={t.id} className="info-row flex-between" style={{ padding: '10px 0' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{t.title}</div>
-                          {t.clientName && <div className="text-secondary" style={{ fontSize: 12 }}>{t.clientName}</div>}
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                          <div className={`${priorityClass(t.priority)}`} style={{ fontSize: 12, fontWeight: 600 }}>
-                            {t.priority.toUpperCase()}
-                          </div>
-                          <div className={`text-muted`} style={{ fontSize: 12 }}>
-                            {t.dueDate < new Date() ? (
-                              <span className="text-red">Overdue</span>
-                            ) : (
-                              t.dueDate.toLocaleDateString('en-IN')
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Recent Interactions</h2>
-                  <Link href="/interactions" className="btn btn-ghost btn-sm">View All</Link>
+              <div className="metric-feature metric-clients">
+                <span>Active Clients</span>
+                <strong>{activeClients}</strong>
+                <small>+{Math.max(0, clients.filter((c) => c.currentValue > 0).length)} funded</small>
+                <div className="avatar-stack">
+                  {clients.slice(0, 4).map((client) => <i key={client.id}>{client.name.charAt(0)}</i>)}
+                  {clients.length > 4 && <i>{clients.length - 4}+</i>}
                 </div>
-                {recentInteractions.length === 0 ? (
-                  <div className="empty-state" style={{ padding: '24px' }}>
-                    <p>No recent interactions</p>
-                  </div>
-                ) : (
-                  <div>
-                    {recentInteractions.map((i) => (
-                      <div key={i.id} className="info-row flex-between" style={{ padding: '10px 0' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{i.subject}</div>
-                          {i.clientName && <div className="text-secondary" style={{ fontSize: 12 }}>{i.clientName}</div>}
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-                          <span className="badge badge-blue">{i.type}</span>
-                          <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>{i.date.toLocaleDateString('en-IN')}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              </div>
+              <div className="metric-feature metric-dark">
+                <span>Tasks Due</span>
+                <strong>{pendingTasks.length}</strong>
+                <small>{overdue} overdue · {todayTasks} today</small>
+                <div className="mini-bars">{[1, 2, 3, 4, 5, 6, 7].map((n) => <i key={n} className={n <= Math.min(7, pendingTasks.length) ? 'on' : ''} />)}</div>
+              </div>
+              <div className="metric-feature metric-pipeline">
+                <span>Pipeline</span>
+                <strong>{pipeline ? `₹${cr(pipeline)}` : '₹0 Cr'}</strong>
+                <small>{clients.filter((c) => c.currentValue === 0).length} leads · {meetingsThisMonth} meetings</small>
+                <div className="bar-spark">{[28, 42, 31, 50, 40, 58, 52].map((h, i) => <i key={i} style={{ height: `${h}%` }} />)}</div>
               </div>
             </div>
 
-            <div className="card mt-24">
-              <div className="card-header">
-                <h2 className="card-title">Recent Clients</h2>
-                <Link href="/clients" className="btn btn-ghost btn-sm">View All</Link>
-              </div>
-              <div className="table-wrap" style={{ border: 'none' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Client</th>
-                      <th>Email</th>
-                      <th>Risk Profile</th>
-                      <th>Tags</th>
-                      <th>Date Added</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentClients.length === 0 ? (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No clients yet</td></tr>
-                    ) : recentClients.map((c) => (
-                      <tr key={c.id}>
-                        <td>
-                          <Link href={`/clients/${c.id}`} className="flex-center gap-8" style={{ color: 'inherit' }}>
-                            <div className="client-avatar">{c.name.charAt(0).toUpperCase()}</div>
-                            <span style={{ fontWeight: 600 }}>{c.name}</span>
-                          </Link>
-                        </td>
-                        <td className="text-secondary">{c.email}</td>
-                        <td><span className={`badge ${riskBadge(c.riskProfile)}`}>{c.riskProfile.replace(/_/g, ' ')}</span></td>
-                        <td>
-                          <div className="flex flex-wrap gap-8">
-                            {c.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}
+            <div className="dashboard-layout">
+              <main>
+                <section className="dashboard-panel">
+                  <div className="dashboard-card-head">
+                    <div className="flex-center gap-8">
+                      <h2>Top clients by AUM</h2>
+                      <span>live from client portfolios</span>
+                    </div>
+                    <Link href="/clients" className="pill-link">View all →</Link>
+                  </div>
+                  <div className="top-client-grid">
+                    {topClients.length === 0 ? (
+                      <div className="empty-state"><h3>No portfolio data yet</h3><p>Add client holdings to populate AUM rankings.</p></div>
+                    ) : topClients.map((client, index) => {
+                      const gain = client.investedAmount ? ((client.currentValue - client.investedAmount) / client.investedAmount) * 100 : 0;
+                      return (
+                        <Link key={client.id} href={`/clients/${client.id}`} className={`top-client-card ${RISK_STYLE[client.riskProfile] || 'client-card-blue'}`}>
+                          <div className="top-client-meta">
+                            <span>{client.riskProfile.replace('_', ' ')}</span>
+                            <i><ArrowUpRight size={16} /></i>
                           </div>
-                        </td>
-                        <td className="text-secondary">{c.createdAt.toLocaleDateString('en-IN')}</td>
-                      </tr>
+                          <h3>{client.name}</h3>
+                          <p>{client.family}</p>
+                          <strong>{cr(client.currentValue)}</strong>
+                          <small>{gain >= 0 ? '▲' : '▼'} {Math.abs(gain).toFixed(1)}% MTD</small>
+                          <b>{index + 1}</b>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="dashboard-panel pending-panel">
+                  <div className="dashboard-card-head">
+                    <div className="flex-center gap-8">
+                      <h2>Pending tasks</h2>
+                      <span>next 7 days</span>
+                    </div>
+                    <Link href="/tasks" className="pill-link">View all →</Link>
+                  </div>
+                  {nextTasks.length === 0 ? (
+                    <div className="empty-state"><h3>No pending tasks due this week</h3></div>
+                  ) : nextTasks.map((task, index) => (
+                    <div key={task.id} className={`dashboard-task-row ${index === 0 ? 'featured' : ''}`}>
+                      <Circle size={18} />
+                      <div>
+                        <h3>{task.title}</h3>
+                        <p>{task.clientName || 'General'} · {dayKey(task.dueDate) === dayKey(now) ? 'Today' : task.dueDate.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                      </div>
+                      <span>{task.priority.toUpperCase()}</span>
+                    </div>
+                  ))}
+                  <p className="xp-note"><Check size={13} /> Tap to complete · earn +10 XP per task</p>
+                </section>
+              </main>
+
+              <aside>
+                <CalendarCard events={events} />
+
+                <section className="dashboard-panel goals-panel">
+                  <div className="dashboard-card-head">
+                    <div className="flex-center gap-8">
+                      <h2>{goalsTitle}</h2>
+                      <span>{MONTHS[now.getMonth()]}</span>
+                    </div>
+                    <strong className="rank-pill"><Trophy size={13} /> {rankLabel}</strong>
+                  </div>
+                  <div className="goal-grid">
+                    {goalMetrics.map((metric) => (
+                      <div key={metric.label}>
+                        <ProgressRing value={metric.value} color={metric.color} />
+                        <h3>{metric.label}</h3>
+                        <p>{metric.sub}</p>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </section>
+
+                <section className="dashboard-panel risk-panel">
+                  <div className="dashboard-card-head">
+                    <div className="flex-center gap-8">
+                      <h2>Risk & review</h2>
+                      <span>{riskFlags.length} flags</span>
+                    </div>
+                  </div>
+                  {riskFlags.length === 0 ? (
+                    <div className="soft-empty">No active review flags.</div>
+                  ) : riskFlags.map((flag) => (
+                    <div key={`${flag.label}-${flag.detail}`} className={`risk-row ${flag.tone}`}>
+                      <b />
+                      <div>
+                        <span>{flag.label}</span>
+                        <p>{flag.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+
+                <section className="dashboard-panel touch-panel">
+                  <div className="dashboard-card-head">
+                    <div className="flex-center gap-8">
+                      <h2>Personal touchpoints</h2>
+                      <span>upcoming</span>
+                    </div>
+                  </div>
+                  {personalTouchpoints.length === 0 ? (
+                    <div className="soft-empty">No birthdays this month.</div>
+                  ) : personalTouchpoints.map((client) => (
+                    <div key={client.id} className="touch-row">
+                      <i>{client.name.split(' ').map((part) => part.charAt(0)).join('').slice(0, 2)}</i>
+                      <div>
+                        <h3>{client.name}</h3>
+                        <p>birthday · {client.birthday?.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
+                      </div>
+                      <Link href={`/clients/${client.id}`}>Note</Link>
+                    </div>
+                  ))}
+                </section>
+              </aside>
             </div>
           </>
         )}
