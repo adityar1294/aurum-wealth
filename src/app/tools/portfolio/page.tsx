@@ -97,24 +97,24 @@ export default function PortfolioAnalysisPage() {
         ) : (
           <>
             <div className="grid-3" style={{ marginBottom: 24 }}>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-blue-dim)' }}><BarChart2 size={18} color="var(--accent-blue)" /></div>
-                <div className="metric-label">Total AUM</div>
-                <div className="metric-value" style={{ fontSize: 22, color: 'var(--accent-blue)' }}>{formatCompact(totalAUM)}</div>
-                <div className="metric-sub">{formatINR(totalAUM)}</div>
+              <div className="metric-card card-gold shadow-md radius-card">
+                <div className="metric-icon" style={{ background: 'var(--surface-primary)' }}><BarChart2 size={18} color="var(--accent-gold)" /></div>
+                <div className="metric-label text-mono" style={{ color: 'var(--text-primary)', opacity: 0.8 }}>Total AUM</div>
+                <div className="metric-value text-display text-primary" style={{ fontSize: 22 }}>{formatCompact(totalAUM)}</div>
+                <div className="metric-sub text-primary">{formatINR(totalAUM)}</div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-gold-dim)' }}><TrendingUp size={18} color="var(--accent-gold)" /></div>
-                <div className="metric-label">Total Return</div>
-                <div className="metric-value" style={{ fontSize: 22, color: totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+              <div className="metric-card glass-wrap">
+                <div className="metric-icon" style={{ background: 'var(--accent-blue)' }}><TrendingUp size={18} color="var(--text-primary)" /></div>
+                <div className="metric-label text-mono text-secondary">Total Return</div>
+                <div className="metric-value text-display" style={{ fontSize: 22, color: totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-rose)' }}>
                   {formatCompact(Math.abs(totalReturn))}
                 </div>
-                <div className="metric-sub" style={{ color: totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>{formatPercent(totalReturnPct)}</div>
+                <div className="metric-sub" style={{ color: totalReturn >= 0 ? 'var(--accent-green)' : 'var(--accent-rose)' }}>{formatPercent(totalReturnPct)}</div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-green-dim)' }}><Users size={18} color="var(--accent-green)" /></div>
-                <div className="metric-label">Clients</div>
-                <div className="metric-value">{clients.length}</div>
+              <div className="metric-card glass-wrap">
+                <div className="metric-icon" style={{ background: 'var(--accent-green)' }}><Users size={18} color="var(--text-primary)" /></div>
+                <div className="metric-label text-mono text-secondary">Clients</div>
+                <div className="metric-value text-display">{clients.length}</div>
               </div>
             </div>
 

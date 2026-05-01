@@ -1,5 +1,25 @@
 /* =================== CSS Variables =================== */
 :root {
+  /* Sunday v2 Design System */
+  --bg-base: #efeae0;
+  --surface-primary: rgba(255, 255, 255, 0.85);
+  --surface-dark: #333333;
+  --accent-gold: #C9A84C;
+  --accent-blue: #93c5fd;
+  --accent-green: #86efac;
+  --accent-rose: #fda4af;
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-accent: 'Instrument Serif', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 24px;
+  --radius-pill: 9999px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
   --bg: #0D0D0D;
   --bg-surface: #141414;
   --bg-elevated: #1A1A1A;
@@ -951,4 +971,29 @@ p { margin: 0; }
   background: #3D1515 !important;
   color: #E05252 !important;
   border-color: #3D1515 !important;
+}
+/* =================== Sunday v2 Utilities =================== */
+.bg-base { background-color: var(--bg-base); }
+.surface-primary { background-color: var(--surface-primary); }
+.surface-dark { background-color: var(--surface-dark); color: white; }
+.card-gold { background-color: var(--accent-gold); border-radius: var(--radius-card); }
+.card-blue { background-color: var(--accent-blue); border-radius: var(--radius-card); }
+.card-green { background-color: var(--accent-green); border-radius: var(--radius-card); }
+.card-rose { background-color: var(--accent-rose); border-radius: var(--radius-card); }
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-display { font-family: var(--font-display); }
+.text-body { font-family: var(--font-body); }
+.text-accent { font-family: var(--font-accent); font-style: italic; }
+.text-mono { font-family: var(--font-mono); }
+.radius-card { border-radius: var(--radius-card); }
+.badge-pill { border-radius: var(--radius-pill); }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.glass-wrap {
+  background: var(--surface-primary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-glass);
 }

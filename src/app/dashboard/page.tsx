@@ -157,19 +157,19 @@ export default function DashboardPage() {
   };
 
   const riskBadge = (r: string) => {
-    const map: Record<string, string> = { conservative: 'badge-green', moderate: 'badge-blue', aggressive: 'badge-yellow', very_aggressive: 'badge-red' };
-    return map[r] || 'badge-gray';
+    const map: Record<string, string> = { conservative: 'card-green', moderate: 'card-blue', aggressive: 'card-gold', very_aggressive: 'card-rose' };
+    return `${map[r] || 'badge-gray'} badge-pill text-primary`;
   };
 
-  const priorityClass = (p: string) => `priority-${p}`;
+  const priorityClass = (p: string) => `priority-${p} text-mono`;
 
   return (
     <AppShell>
-      <div className="page">
+      <div className="page bg-base text-body">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-subtitle">Welcome back, {user?.name}</p>
+            <h1 className="page-title text-display">Dashboard</h1>
+            <p className="page-subtitle text-secondary">Welcome back, {user?.name}</p>
           </div>
         </div>
 
@@ -178,33 +178,33 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="grid-4">
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-blue-dim)' }}>
-                  <Users size={18} color="var(--accent-blue)" />
+              <div className="metric-card glass-wrap">
+                <div className="metric-icon" style={{ background: 'var(--accent-blue)' }}>
+                  <Users size={18} color="var(--text-primary)" />
                 </div>
-                <div className="metric-label">Total Clients</div>
-                <div className="metric-value">{stats.totalClients}</div>
+                <div className="metric-label text-secondary text-mono">Total Clients</div>
+                <div className="metric-value text-display">{stats.totalClients}</div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-gold-dim)' }}>
-                  <CheckSquare size={18} color="var(--accent-gold)" />
+              <div className="metric-card surface-dark radius-card shadow-md">
+                <div className="metric-icon" style={{ background: 'var(--text-secondary)' }}>
+                  <CheckSquare size={18} color="var(--surface-primary)" />
                 </div>
-                <div className="metric-label">Pending Tasks</div>
-                <div className="metric-value">{stats.pendingTasks}</div>
+                <div className="metric-label text-secondary text-mono">Pending Tasks</div>
+                <div className="metric-value text-display text-white">{stats.pendingTasks}</div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-red-dim)' }}>
-                  <AlertCircle size={18} color="var(--accent-red)" />
+              <div className="metric-card glass-wrap">
+                <div className="metric-icon" style={{ background: 'var(--accent-rose)' }}>
+                  <AlertCircle size={18} color="var(--text-primary)" />
                 </div>
-                <div className="metric-label">Overdue Tasks</div>
-                <div className="metric-value" style={{ color: stats.overdueTasks > 0 ? 'var(--accent-red)' : undefined }}>{stats.overdueTasks}</div>
+                <div className="metric-label text-secondary text-mono">Overdue Tasks</div>
+                <div className="metric-value text-display" style={{ color: stats.overdueTasks > 0 ? 'var(--accent-rose)' : undefined }}>{stats.overdueTasks}</div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon" style={{ background: 'var(--accent-green-dim)' }}>
-                  <MessageSquare size={18} color="var(--accent-green)" />
+              <div className="metric-card glass-wrap">
+                <div className="metric-icon" style={{ background: 'var(--accent-green)' }}>
+                  <MessageSquare size={18} color="var(--text-primary)" />
                 </div>
-                <div className="metric-label">Interactions (30d)</div>
-                <div className="metric-value">{stats.recentInteractions}</div>
+                <div className="metric-label text-secondary text-mono">Interactions (30d)</div>
+                <div className="metric-value text-display">{stats.recentInteractions}</div>
               </div>
             </div>
 
