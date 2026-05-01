@@ -48,30 +48,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
-        try {
-          const db = getClientDb();
-          const snap = await getDoc(doc(db, 'users', fbUser.uid));
-          if (snap.exists()) {
-            const data = snap.data();
-            setUser({
-              uid: fbUser.uid,
-              email: data.email,
-              name: data.name,
-              role: data.role,
-              createdAt: data.createdAt?.toDate?.() || new Date(),
-              rmId: data.rmId,
-              clientId: data.clientId,
-            });
-          } else {
+        const loadUserDoc = async (retries = 2): Promise<void> => {
+          try {
+            const db = getClientDb();
+            const snap = await getDoc(doc(db, 'users', fbUser.uid));
+            if (snap.exists()) {
+              const data = snap.data();
+              setUser({
+                uid: fbUser.uid,
+                email: data.email,
+                name: data.name,
+                role: data.role,
+                createdAt: data.createdAt?.toDate?.() || new Date(),
+                rmId: data.rmId,
+                clientId: data.clientId,
+              });
+            } else if (retries > 0) {
+              // Doc may not be written yet (race after account creation) — retry
+              await new Promise((r) => setTimeout(r, 1500));
+              return loadUserDoc(retries - 1);
+            } else {
+              setUser(null);
+            }
+          } catch {
             setUser(null);
           }
-        } catch {
-          setUser(null);
-        }
+          setLoading(false);
+        };
+        loadUserDoc();
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsubscribe;
   }, [configured]);

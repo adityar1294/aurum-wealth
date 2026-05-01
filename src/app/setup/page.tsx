@@ -4,10 +4,8 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
 
 export default function SetupPage() {
-  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +32,10 @@ export default function SetupPage() {
         throw new Error(data.error || 'Setup failed');
       }
 
-      router.replace('/dashboard');
+      // Full reload so Firebase rehydrates auth state after the Firestore
+      // user document is written — avoids a race where onAuthStateChanged
+      // fires before the document exists and sets user to null.
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
