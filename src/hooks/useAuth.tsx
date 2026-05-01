@@ -70,7 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               setUser(null);
             }
-          } catch {
+          } catch (err) {
+            console.error('[useAuth] Firestore fetch failed:', err);
             setUser(null);
           }
           setLoading(false);
