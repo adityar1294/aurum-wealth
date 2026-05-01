@@ -9,26 +9,27 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
+    "crypto-js": "^4.2.0",
+    "firebase": "^11.2.0",
+    "firebase-admin": "^13.0.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "lucide-react": "^0.469.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "firebase": "^11.2.0",
-    "firebase-admin": "^13.0.0",
     "recharts": "^2.14.1",
-    "lucide-react": "^0.469.0",
-    "crypto-js": "^4.2.0",
-    "yahoo-finance2": "^2.13.3",
-    "jspdf": "^2.5.2",
-    "html2canvas": "^1.4.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "yahoo-finance2": "^2.13.3"
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/crypto-js": "^4.2.2",
-    "typescript": "^5.7.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.1.0"
+    "eslint-config-next": "^15.1.0",
+    "typescript": "^5.7.0"
   }
 }
