@@ -5,7 +5,7 @@ import {
   deleteDoc, doc, serverTimestamp, orderBy,
 } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Edit2, Trash2, RefreshCw, ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { Holding, Transaction, AssetType, TransactionType } from '@/lib/types';
 import { ASSET_LABELS, ASSET_COLORS } from '@/lib/assetLabels';
@@ -436,12 +436,15 @@ export default function PortfolioTab({ clientId }: Props) {
             <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Asset Allocation</h3>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={allocationData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85}
+                <Pie data={allocationData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}
                   label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>
                   {allocationData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatINR(v)} />
-                <Legend iconType="circle" iconSize={10} />
+                <Tooltip
+                  formatter={(v: number, _name: string, props) => [formatINR(v), props.payload?.name]}
+                  contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(22,20,15,0.10)', borderRadius: 10, fontSize: 12 }}
+                  itemStyle={{ fontWeight: 600 }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>

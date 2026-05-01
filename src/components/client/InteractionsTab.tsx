@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus, Edit2, Trash2, Phone, Mail, Users, MessageCircle, Video, FileText } from 'lucide-react';
@@ -38,15 +38,22 @@ export default function InteractionsTab({ clientId }: Props) {
     const db = getClientDb();
     setLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'interactions'), where('clientId', '==', clientId), orderBy('date', 'desc')));
-      setItems(snap.docs.map((d) => ({
+      // No orderBy — avoids needing a composite (clientId, date) index; sort client-side instead
+      const snap = await getDocs(query(collection(db, 'interactions'), where('clientId', '==', clientId)));
+      const mapped: Interaction[] = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
         date: d.data().date?.toDate?.() || new Date(d.data().date),
         followUpDate: d.data().followUpDate?.toDate?.() || (d.data().followUpDate ? new Date(d.data().followUpDate) : undefined),
         notes: decrypt(d.data().notes || ''),
         followUpNote: d.data().followUpNote || '',
-      } as Interaction)));
+      } as Interaction));
+      mapped.sort((a, b) => {
+        const aTime = (a.date instanceof Date ? a.date : new Date()).getTime();
+        const bTime = (b.date instanceof Date ? b.date : new Date()).getTime();
+        return bTime - aTime;
+      });
+      setItems(mapped);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };

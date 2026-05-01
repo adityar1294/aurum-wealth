@@ -157,19 +157,22 @@ export default function DashboardPage() {
   };
 
   const riskBadge = (r: string) => {
-    const map: Record<string, string> = { conservative: 'card-green', moderate: 'card-blue', aggressive: 'card-gold', very_aggressive: 'card-rose' };
-    return `${map[r] || 'badge-gray'} badge-pill text-primary`;
+    const map: Record<string, string> = {
+      very_conservative: 'badge-blue', conservative: 'badge-green',
+      moderate: 'badge-blue', aggressive: 'badge-yellow', very_aggressive: 'badge-red',
+    };
+    return map[r] || 'badge-gray';
   };
 
-  const priorityClass = (p: string) => `priority-${p} text-mono`;
+  const priorityClass = (p: string) => `priority-${p}`;
 
   return (
     <AppShell>
-      <div className="page bg-base text-body">
+      <div className="page">
         <div className="page-header">
           <div>
-            <h1 className="page-title text-display">Dashboard</h1>
-            <p className="page-subtitle text-secondary">Welcome back, {user?.name}</p>
+            <h1 className="page-title">Dashboard</h1>
+            <p className="page-subtitle">Welcome back, {user?.name}</p>
           </div>
         </div>
 
@@ -178,37 +181,37 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="grid-4">
-              <div className="metric-card glass-wrap">
-                <div className="metric-icon" style={{ background: 'var(--accent-blue)' }}>
-                  <Users size={18} color="var(--text-primary)" />
+              <div className="metric-card">
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-blue-dim)', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <Users size={18} />
                 </div>
-                <div className="metric-label text-secondary text-mono">Total Clients</div>
-                <div className="metric-value text-display">{stats.totalClients}</div>
+                <div className="metric-label">Total Clients</div>
+                <div className="metric-value">{stats.totalClients}</div>
               </div>
-              <div className="metric-card surface-dark radius-card shadow-md">
-                <div className="metric-icon" style={{ background: 'var(--text-secondary)' }}>
-                  <CheckSquare size={18} color="var(--surface-primary)" />
+              <div className="metric-card">
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-gold-dim)', color: 'var(--yolk-dk)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <CheckSquare size={18} />
                 </div>
-                <div className="metric-label text-secondary text-mono">Pending Tasks</div>
-                <div className="metric-value text-display text-white">{stats.pendingTasks}</div>
+                <div className="metric-label">Pending Tasks</div>
+                <div className="metric-value">{stats.pendingTasks}</div>
               </div>
-              <div className="metric-card glass-wrap">
-                <div className="metric-icon" style={{ background: 'var(--accent-rose)' }}>
-                  <AlertCircle size={18} color="var(--text-primary)" />
+              <div className="metric-card">
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-red-dim)', color: 'var(--accent-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <AlertCircle size={18} />
                 </div>
-                <div className="metric-label text-secondary text-mono">Overdue Tasks</div>
-                <div className="metric-value text-display" style={{ color: stats.overdueTasks > 0 ? 'var(--accent-rose)' : undefined }}>{stats.overdueTasks}</div>
+                <div className="metric-label">Overdue Tasks</div>
+                <div className="metric-value" style={{ color: stats.overdueTasks > 0 ? 'var(--accent-red)' : undefined }}>{stats.overdueTasks}</div>
               </div>
-              <div className="metric-card glass-wrap">
-                <div className="metric-icon" style={{ background: 'var(--accent-green)' }}>
-                  <MessageSquare size={18} color="var(--text-primary)" />
+              <div className="metric-card">
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent-green-dim)', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <MessageSquare size={18} />
                 </div>
-                <div className="metric-label text-secondary text-mono">Interactions (30d)</div>
-                <div className="metric-value text-display">{stats.recentInteractions}</div>
+                <div className="metric-label">Interactions (30d)</div>
+                <div className="metric-value">{stats.recentInteractions}</div>
               </div>
             </div>
 
-            <div className="grid-2 mt-24">
+            <div className="grid-2 mt-24" style={{ marginTop: 20 }}>
               <div className="card">
                 <div className="card-header">
                   <h2 className="card-title">Pending Tasks</h2>
@@ -300,7 +303,7 @@ export default function DashboardPage() {
                           </Link>
                         </td>
                         <td className="text-secondary">{c.email}</td>
-                        <td><span className={`badge ${riskBadge(c.riskProfile)}`}>{c.riskProfile}</span></td>
+                        <td><span className={`badge ${riskBadge(c.riskProfile)}`}>{c.riskProfile.replace(/_/g, ' ')}</span></td>
                         <td>
                           <div className="flex flex-wrap gap-8">
                             {c.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}
