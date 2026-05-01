@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { Plus, Edit2, Trash2, CheckCircle, Filter } from 'lucide-react';
@@ -36,6 +36,7 @@ export default function TasksPage() {
   }, [tasks, statusFilter, priorityFilter]);
 
   const load = async () => {
+    const db = getClientDb();
     if (!user) return;
     setLoading(true);
     try {
@@ -78,6 +79,7 @@ export default function TasksPage() {
   };
 
   const save = async () => {
+    const db = getClientDb();
     if (!user) return;
     const data = { title: form.title, description: form.description, priority: form.priority, status: form.status, dueDate: new Date(form.dueDate), rmId: user.uid };
     if (editing) {
@@ -92,12 +94,14 @@ export default function TasksPage() {
   };
 
   const remove = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this task?')) return;
     await deleteDoc(doc(db, 'tasks', id));
     load();
   };
 
   const quickComplete = async (t: Task) => {
+    const db = getClientDb();
     await updateDoc(doc(db, 'tasks', t.id), { status: 'completed', completedAt: new Date() });
     load();
   };

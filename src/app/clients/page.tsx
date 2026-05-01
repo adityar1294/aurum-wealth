@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { Search, Plus, Filter } from 'lucide-react';
@@ -48,6 +48,7 @@ export default function ClientsPage() {
   }, [clients, search, riskFilter]);
 
   const loadClients = async () => {
+    const db = getClientDb();
     if (!user) return;
     try {
       const q = user.role === 'admin'

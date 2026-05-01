@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { Plus, Edit2, Trash2, Search, Phone, Mail, Users, MessageCircle, FileText, Video } from 'lucide-react';
@@ -45,6 +45,7 @@ export default function InteractionsPage() {
   }, [items, typeFilter, search]);
 
   const load = async () => {
+    const db = getClientDb();
     if (!user) return;
     setLoading(true);
     try {
@@ -96,6 +97,7 @@ export default function InteractionsPage() {
   };
 
   const save = async () => {
+    const db = getClientDb();
     if (!user) return;
     const data = {
       clientId: form.clientId, rmId: user.uid, type: form.type, subject: form.subject,
@@ -113,6 +115,7 @@ export default function InteractionsPage() {
   };
 
   const remove = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this interaction?')) return;
     await deleteDoc(doc(db, 'interactions', id));
     load();

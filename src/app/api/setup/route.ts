@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import { verifyIdToken, firestoreCount, firestoreSet } from '@/lib/firebase-admin';
 
 export async function POST(req: NextRequest) {
   try {
-    const db = getAdminDb();
+    const { idToken, name } = await req.json();
+    if (!idToken) return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });
 
-    const usersSnap = await db.collection('users').limit(1).get();
-    if (!usersSnap.empty) {
-      return NextResponse.json({ error: 'Setup already complete' }, { status: 403 });
-    }
+    const decoded = await verifyIdToken(idToken);
 
-    const body = await req.json();
-    const { idToken, name } = body;
+    const count = await firestoreCount(idToken, 'users');
+    if (count > 0) return NextResponse.json({ error: 'Setup already complete' }, { status: 403 });
 
-    if (!idToken) {
-      return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });
-    }
-
-    const adminAuth = getAdminAuth();
-    const decoded = await adminAuth.verifyIdToken(idToken);
-
-    await db.collection('users').doc(decoded.uid).set({
+    await firestoreSet(idToken, `users/${decoded.uid}`, {
       uid: decoded.uid,
       email: decoded.email,
       name: name || decoded.email,
@@ -28,11 +19,11 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     });
 
-    await db.collection('_setup').doc('complete').set({ doneAt: new Date() });
+    await firestoreSet(idToken, '_setup/complete', { doneAt: new Date() });
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Setup error:', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal error' }, { status: 500 });
   }
 }

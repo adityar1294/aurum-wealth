@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { Task, TaskStatus, TaskPriority } from '@/lib/types';
@@ -27,6 +27,7 @@ export default function TasksTab({ clientId }: Props) {
   useEffect(() => { load(); }, [clientId]);
 
   const load = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'tasks'), where('clientId', '==', clientId)));
@@ -52,6 +53,7 @@ export default function TasksTab({ clientId }: Props) {
   };
 
   const save = async () => {
+    const db = getClientDb();
     if (!user) return;
     const data = { title: form.title, description: form.description, priority: form.priority, status: form.status, dueDate: new Date(form.dueDate), clientId, rmId: user.uid };
     if (editing) {
@@ -66,12 +68,14 @@ export default function TasksTab({ clientId }: Props) {
   };
 
   const remove = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this task?')) return;
     await deleteDoc(doc(db, 'tasks', id));
     load();
   };
 
   const quickComplete = async (t: Task) => {
+    const db = getClientDb();
     await updateDoc(doc(db, 'tasks', t.id), { status: 'completed', completedAt: new Date() });
     load();
   };

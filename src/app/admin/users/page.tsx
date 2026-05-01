@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
+import { getClientDb, getClientAuth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { Plus, Edit2, Trash2, Shield, User, Users } from 'lucide-react';
@@ -22,6 +22,7 @@ export default function AdminUsersPage() {
   useEffect(() => { if (user?.role === 'admin') load(); }, [user]);
 
   const load = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, 'users'));
@@ -30,6 +31,8 @@ export default function AdminUsersPage() {
   };
 
   const create = async () => {
+    const db = getClientDb();
+    const auth = getClientAuth();
     setError('');
     setSaving(true);
     try {
@@ -47,11 +50,13 @@ export default function AdminUsersPage() {
   };
 
   const changeRole = async (uid: string, role: Role) => {
+    const db = getClientDb();
     await updateDoc(doc(db, 'users', uid), { role });
     load();
   };
 
   const remove = async (uid: string) => {
+    const db = getClientDb();
     if (!confirm('Remove this user?')) return;
     await deleteDoc(doc(db, 'users', uid));
     load();

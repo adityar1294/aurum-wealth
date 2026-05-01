@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { RefreshCw, LogOut, TrendingUp, TrendingDown } from 'lucide-react';
@@ -31,6 +31,7 @@ export default function PortalPage() {
   }, [user, authLoading]);
 
   const load = async (cid: string) => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const hSnap = await getDocs(query(collection(db, 'holdings'), where('clientId', '==', cid)));

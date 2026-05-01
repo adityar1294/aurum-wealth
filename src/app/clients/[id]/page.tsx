@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import OverviewTab from '@/components/client/OverviewTab';
@@ -29,6 +29,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   }, [id]);
 
   const loadClient = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDoc(doc(db, 'clients', id));

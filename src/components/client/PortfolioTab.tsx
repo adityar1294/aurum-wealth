@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Plus, Edit2, Trash2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { Holding, Transaction, AssetType, TransactionType } from '@/lib/types';
@@ -61,6 +61,7 @@ export default function PortfolioTab({ clientId }: Props) {
   useEffect(() => { loadHoldings(); }, [clientId]);
 
   const loadHoldings = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'holdings'), where('clientId', '==', clientId)));
@@ -78,6 +79,7 @@ export default function PortfolioTab({ clientId }: Props) {
   };
 
   const refreshPrices = async () => {
+    const db = getClientDb();
     setRefreshing(true);
     try {
       const equityHoldings = holdings.filter((h) => h.symbol && (h.assetType === 'equity_india' || h.assetType === 'equity_global'));
@@ -115,6 +117,7 @@ export default function PortfolioTab({ clientId }: Props) {
   };
 
   const saveHolding = async () => {
+    const db = getClientDb();
     const data = {
       clientId,
       assetType: holdingForm.assetType,
@@ -143,12 +146,14 @@ export default function PortfolioTab({ clientId }: Props) {
   };
 
   const deleteHolding = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this holding?')) return;
     await deleteDoc(doc(db, 'holdings', id));
     loadHoldings();
   };
 
   const saveTx = async () => {
+    const db = getClientDb();
     const data = {
       holdingId: txModal.holdingId,
       type: txForm.type,
@@ -168,6 +173,7 @@ export default function PortfolioTab({ clientId }: Props) {
   };
 
   const deleteTx = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this transaction?')) return;
     await deleteDoc(doc(db, 'transactions', id));
     loadHoldings();

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { useRouter } from 'next/navigation';
@@ -34,6 +34,7 @@ export default function NewClientPage() {
   const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
+    const db = getClientDb();
     e.preventDefault();
     if (!user) return;
     setError('');

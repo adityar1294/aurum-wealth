@@ -8,7 +8,7 @@ import {
   signInWithPhoneNumber,
   ConfirmationResult,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Mail, Phone, Chrome } from 'lucide-react';
 
@@ -50,6 +50,7 @@ export default function AuthForm({ accent = 'blue', redirectTo, title, subtitle 
   }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
+    const auth = getClientAuth();
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -64,6 +65,7 @@ export default function AuthForm({ accent = 'blue', redirectTo, title, subtitle 
   };
 
   const handleGoogle = async () => {
+    const auth = getClientAuth();
     setError('');
     setLoading(true);
     try {
@@ -78,6 +80,7 @@ export default function AuthForm({ accent = 'blue', redirectTo, title, subtitle 
   };
 
   const handleSendOtp = async (e: React.FormEvent) => {
+    const auth = getClientAuth();
     e.preventDefault();
     setError('');
     setLoading(true);

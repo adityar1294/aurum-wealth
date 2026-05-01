@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { encrypt, decrypt } from '@/lib/encryption';
 import { Eye, EyeOff, Edit2, Save, X } from 'lucide-react';
 import { Client, RiskProfile, TaxSlab } from '@/lib/types';
@@ -47,6 +47,7 @@ export default function OverviewTab({ client, onRefresh }: Props) {
   };
 
   const handleSave = async () => {
+    const db = getClientDb();
     setSaving(true);
     try {
       const personalInfo = {

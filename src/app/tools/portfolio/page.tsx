@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import {
@@ -33,6 +33,7 @@ export default function PortfolioAnalysisPage() {
   useEffect(() => { if (user) load(); }, [user]);
 
   const load = async () => {
+    const db = getClientDb();
     if (!user) return;
     setLoading(true);
     try {

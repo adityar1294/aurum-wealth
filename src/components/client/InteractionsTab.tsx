@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus, Edit2, Trash2, Phone, Mail, Users, MessageCircle, Video, FileText } from 'lucide-react';
 import { Interaction, InteractionType } from '@/lib/types';
@@ -35,6 +35,7 @@ export default function InteractionsTab({ clientId }: Props) {
   useEffect(() => { load(); }, [clientId]);
 
   const load = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'interactions'), where('clientId', '==', clientId), orderBy('date', 'desc')));
@@ -70,6 +71,7 @@ export default function InteractionsTab({ clientId }: Props) {
   };
 
   const save = async () => {
+    const db = getClientDb();
     if (!user) return;
     const data = {
       clientId,
@@ -91,6 +93,7 @@ export default function InteractionsTab({ clientId }: Props) {
   };
 
   const remove = async (id: string) => {
+    const db = getClientDb();
     if (!confirm('Delete this interaction?')) return;
     await deleteDoc(doc(db, 'interactions', id));
     load();

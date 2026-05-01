@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 export default function SetupPage() {
@@ -15,6 +15,7 @@ export default function SetupPage() {
   const [error, setError] = useState('');
 
   const handleSetup = async (e: React.FormEvent) => {
+    const auth = getClientAuth();
     e.preventDefault();
     setError('');
     setLoading(true);

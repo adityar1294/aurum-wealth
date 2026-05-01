@@ -9,7 +9,7 @@ import {
   limit,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import { Users, CheckSquare, AlertCircle, MessageSquare } from 'lucide-react';
@@ -62,6 +62,7 @@ export default function DashboardPage() {
   }, [user]);
 
   const loadDashboard = async () => {
+    const db = getClientDb();
     if (!user) return;
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

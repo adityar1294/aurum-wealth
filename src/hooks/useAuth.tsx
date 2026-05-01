@@ -13,13 +13,14 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { isFirebaseConfigured, getClientAuth, getClientDb } from '@/lib/firebase';
 import { User } from '@/lib/types';
 
 interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
   user: User | null;
   loading: boolean;
+  configured: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextValue>({
   firebaseUser: null,
   user: null,
   loading: true,
+  configured: true,
   signOut: async () => {},
 });
 
@@ -34,12 +36,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const configured = isFirebaseConfigured();
 
   useEffect(() => {
+    if (!configured) {
+      setLoading(false);
+      return;
+    }
+
+    const auth = getClientAuth();
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
         try {
+          const db = getClientDb();
           const snap = await getDoc(doc(db, 'users', fbUser.uid));
           if (snap.exists()) {
             const data = snap.data();
@@ -64,16 +74,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [configured]);
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    if (!configured) return;
+    await firebaseSignOut(getClientAuth());
     setUser(null);
     setFirebaseUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, user, loading, signOut }}>
+    <AuthContext.Provider value={{ firebaseUser, user, loading, configured, signOut }}>
       {children}
     </AuthContext.Provider>
   );

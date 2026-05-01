@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { getClientDb, getClientStorage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Trash2, Download, Upload, FileText, File } from 'lucide-react';
 import { Document, DocumentCategory } from '@/lib/types';
@@ -28,6 +28,7 @@ export default function DocumentsTab({ clientId }: Props) {
   useEffect(() => { load(); }, [clientId]);
 
   const load = async () => {
+    const db = getClientDb();
     setLoading(true);
     try {
       const snap = await getDocs(query(collection(db, 'documents'), where('clientId', '==', clientId)));
@@ -36,6 +37,8 @@ export default function DocumentsTab({ clientId }: Props) {
   };
 
   const handleFile = async (file: File) => {
+    const db = getClientDb();
+    const storage = getClientStorage();
     if (!user) return;
     setUploading(true);
     setUploadProgress(0);
@@ -74,6 +77,8 @@ export default function DocumentsTab({ clientId }: Props) {
   };
 
   const handleDelete = async (d: DocWithUrl) => {
+    const db = getClientDb();
+    const storage = getClientStorage();
     if (!confirm('Delete this document?')) return;
     try {
       await deleteObject(storageRef(storage, d.storagePath));
@@ -83,6 +88,7 @@ export default function DocumentsTab({ clientId }: Props) {
   };
 
   const handleDownload = async (d: DocWithUrl) => {
+    const storage = getClientStorage();
     try {
       const url = await getDownloadURL(storageRef(storage, d.storagePath));
       window.open(url, '_blank');
