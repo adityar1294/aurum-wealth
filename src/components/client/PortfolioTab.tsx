@@ -575,11 +575,10 @@ export default function PortfolioTab({ clientId }: Props) {
                   )}
                 </div>
                 {showTickerDropdown && tickerResults.length > 0 && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                    background: 'var(--bg-card)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-lg)',
-                    maxHeight: 260, overflowY: 'auto', marginTop: 4,
+                  <div className="glass-wrap shadow-glass" style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+                    border: '1px solid var(--border)',
+                    maxHeight: 260, overflowY: 'auto',
                   }}>
                     {tickerResults.map((t) => (
                       <button
@@ -589,14 +588,15 @@ export default function PortfolioTab({ clientId }: Props) {
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           width: '100%', padding: '10px 14px', background: 'none', border: 'none',
-                          cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid var(--border-subtle)',
+                          color: 'var(--text-primary)',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-elevated)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                       >
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13.5 }}>{t.symbol}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{t.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{t.name}</div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.exchange}</div>
