@@ -5,11 +5,14 @@ import {
   query,
   where,
   getDocs,
+  updateDoc,
+  doc,
   Timestamp,
 } from 'firebase/firestore';
 import {
   ArrowUpRight,
   Check,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -56,6 +59,7 @@ interface RiskFlag {
   tone: 'gold' | 'red' | 'blue';
   label: string;
   detail: string;
+  action?: string;
 }
 
 const AUM_TARGET = 365_00_00_000;
@@ -96,9 +100,24 @@ function ProgressRing({ value, color }: { value: number; color: string }) {
 
 function CalendarCard({ events }: { events: DashboardEvent[] }) {
   const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const offset = monthStart.getDay();
+  const [viewYear,    setViewYear]    = useState(today.getFullYear());
+  const [viewMonth,   setViewMonth]   = useState(today.getMonth());
+  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
+    else setViewMonth((m) => m - 1);
+    setSelectedDay(null);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
+    else setViewMonth((m) => m + 1);
+    setSelectedDay(null);
+  };
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const offset      = new Date(viewYear, viewMonth, 1).getDay();
+
   const byDay = useMemo(() => {
     const map: Record<string, DashboardEvent[]> = {};
     events.forEach((event) => {
@@ -107,43 +126,100 @@ function CalendarCard({ events }: { events: DashboardEvent[] }) {
     });
     return map;
   }, [events]);
-  const todayEvents = byDay[dayKey(today)] || [];
+
+  const isCurrentMonth = viewMonth === today.getMonth() && viewYear === today.getFullYear();
+  const todayEvents    = byDay[dayKey(today)] || [];
+
+  const selectedDate   = selectedDay ? new Date(viewYear, viewMonth, selectedDay) : null;
+  const selectedEvents = selectedDate ? (byDay[dayKey(selectedDate)] || []) : [];
+
+  const TYPE_DOT: Record<string, string> = {
+    task: 'var(--accent-blue)', meeting: 'var(--accent-green)', follow_up: 'var(--yolk-dk)', event: 'var(--accent-purple)',
+  };
 
   return (
     <div className="dashboard-panel calendar-panel">
       <div className="dashboard-card-head">
         <div className="flex-center gap-8">
-          <h2>{MONTHS[today.getMonth()]}</h2>
-          <span>{todayEvents.length} item{todayEvents.length !== 1 ? 's' : ''} today</span>
+          <h2>
+            {MONTHS[viewMonth]}{viewYear !== today.getFullYear() ? ` ${viewYear}` : ''}
+          </h2>
+          <span>
+            {isCurrentMonth && todayEvents.length > 0
+              ? `${todayEvents.length} today`
+              : selectedEvents.length > 0
+                ? `${selectedEvents.length} event${selectedEvents.length !== 1 ? 's' : ''}`
+                : ''}
+          </span>
         </div>
         <div className="flex-center gap-8">
-          <button className="dash-icon-button" type="button" aria-label="Previous month"><ChevronLeft size={14} /></button>
-          <button className="dash-icon-button" type="button" aria-label="Next month"><ChevronRight size={14} /></button>
+          <button className="dash-icon-button" type="button" aria-label="Previous month" onClick={prevMonth}>
+            <ChevronLeft size={14} />
+          </button>
+          <button className="dash-icon-button" type="button" aria-label="Next month" onClick={nextMonth}>
+            <ChevronRight size={14} />
+          </button>
         </div>
       </div>
-      <div className="calendar-legend" aria-label="Calendar color logic">
+
+      <div className="calendar-legend">
         <span><i className="legend-dot calm" /> light</span>
         <span><i className="legend-dot steady" /> steady</span>
         <span><i className="legend-dot busy" /> hectic</span>
       </div>
+
       <div className="calendar-grid calendar-weekdays">
         {WEEKDAYS.map((d, i) => <span key={`${d}-${i}`}>{d}</span>)}
       </div>
+
       <div className="calendar-grid">
         {Array.from({ length: offset }).map((_, i) => <div key={`blank-${i}`} />)}
         {Array.from({ length: daysInMonth }).map((_, i) => {
-          const date = new Date(today.getFullYear(), today.getMonth(), i + 1);
-          const count = (byDay[dayKey(date)] || []).length;
-          const isToday = i + 1 === today.getDate();
+          const day  = i + 1;
+          const date = new Date(viewYear, viewMonth, day);
+          const count    = (byDay[dayKey(date)] || []).length;
+          const isToday  = isCurrentMonth && day === today.getDate();
+          const isSelected = day === selectedDay;
           const mood = count >= 4 ? 'hectic' : count >= 2 ? 'steady' : count === 1 ? 'calm' : '';
           return (
-            <div key={i + 1} className={`calendar-day ${mood} ${isToday ? 'today' : ''}`} title={`${count} event${count !== 1 ? 's' : ''}`}>
-              <span>{i + 1}</span>
+            <div
+              key={day}
+              className={`calendar-day ${mood} ${isToday ? 'today' : ''} ${isSelected && !isToday ? 'selected' : ''}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setSelectedDay(day === selectedDay ? null : day)}
+              title={`${count} event${count !== 1 ? 's' : ''}`}
+            >
+              <span>{day}</span>
               {count > 0 && <b />}
             </div>
           );
         })}
       </div>
+
+      {/* Day event list */}
+      {selectedDay !== null && (
+        <div style={{ marginTop: 14, borderTop: '1px solid rgba(22,20,15,0.07)', paddingTop: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink3)', marginBottom: 8 }}>
+            {new Date(viewYear, viewMonth, selectedDay).toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </div>
+          {selectedEvents.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--ink3)' }}>No events scheduled.</p>
+          ) : selectedEvents.map((ev) => (
+            <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 7 }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 4,
+                background: TYPE_DOT[ev.type] || 'var(--ink3)',
+              }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.3 }}>{ev.title}</div>
+                {ev.clientName && (
+                  <div style={{ fontSize: 11, color: 'var(--ink3)' }}>{ev.clientName}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -286,6 +362,19 @@ export default function DashboardPage() {
     }
   };
 
+  const completeTask = async (task: DashboardTask) => {
+    const db = getClientDb();
+    // Optimistic update so the row disappears immediately
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: 'completed' } : t));
+    window.dispatchEvent(new Event('aurum:xp-updated'));
+    try {
+      await updateDoc(doc(db, 'tasks', task.id), { status: 'completed', completedAt: new Date() });
+    } catch {
+      // Rollback on failure
+      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: task.status } : t));
+    }
+  };
+
   const now = new Date();
   const activeClients = clients.length;
   const totalAum = clients.reduce((sum, client) => sum + client.currentValue, 0);
@@ -319,19 +408,50 @@ export default function DashboardPage() {
         { label: 'Touchpoints', sub: 'last 30 days', value: pct(touchpoints, TOUCHPOINT_TARGET), color: '#4ddc7b' },
       ];
 
+  const overdueList  = pendingTasks.filter((t) => t.dueDate < now);
   const riskFlags: RiskFlag[] = [
+    // Allocation drift — aggressive / very-aggressive clients
     ...clients
-      .filter((client) => client.riskProfile === 'aggressive' || client.riskProfile === 'very_aggressive')
+      .filter((c) => c.riskProfile === 'aggressive' || c.riskProfile === 'very_aggressive')
       .slice(0, 1)
-      .map((client) => ({ tone: 'gold' as const, label: `DRIFT · ${client.name.toUpperCase()}`, detail: 'Review aggressive allocation against mandate' })),
-    ...pendingTasks
-      .filter((task) => task.dueDate < now)
+      .map((c) => {
+        const gain = c.investedAmount
+          ? ((c.currentValue - c.investedAmount) / c.investedAmount) * 100
+          : 0;
+        return {
+          tone: 'gold' as const,
+          label: `DRIFT · ${c.name.toUpperCase()}`,
+          detail: `${c.riskProfile.replace('_', ' ')} profile — ${gain >= 0 ? '+' : ''}${gain.toFixed(1)}% overall return. Verify allocation still fits the client's risk mandate.`,
+          action: 'Schedule an allocation review meeting',
+        };
+      }),
+    // Overdue tasks
+    ...overdueList
       .slice(0, 1)
-      .map((task) => ({ tone: 'red' as const, label: `REVIEW · ${(task.clientName || 'CLIENT').toUpperCase()}`, detail: `${task.title} overdue` })),
+      .map((t) => {
+        const days = Math.floor((now.getTime() - t.dueDate.getTime()) / 86400000);
+        const extra = overdueList.length > 1 ? ` (+${overdueList.length - 1} more overdue)` : '';
+        return {
+          tone: 'red' as const,
+          label: `OVERDUE · ${(t.clientName || 'GENERAL').toUpperCase()}`,
+          detail: `"${t.title}" is ${days} day${days !== 1 ? 's' : ''} past due.${extra}`,
+          action: 'Complete the task or reschedule with a new due date',
+        };
+      }),
+    // Portfolio below cost basis
     ...clients
-      .filter((client) => client.currentValue > 0 && client.investedAmount > 0 && client.currentValue < client.investedAmount)
+      .filter((c) => c.currentValue > 0 && c.investedAmount > 0 && c.currentValue < c.investedAmount)
       .slice(0, 1)
-      .map((client) => ({ tone: 'gold' as const, label: `VOLATILITY · ${client.name.toUpperCase()}`, detail: 'Portfolio value below invested amount' })),
+      .map((c) => {
+        const loss    = c.investedAmount - c.currentValue;
+        const lossPct = ((loss / c.investedAmount) * 100).toFixed(1);
+        return {
+          tone: 'gold' as const,
+          label: `VOLATILITY · ${c.name.toUpperCase()}`,
+          detail: `Portfolio is ₹${(loss / 1e7).toFixed(2)} Cr below cost basis (−${lossPct}%). Consider documenting your rationale.`,
+          action: 'Log a note or review the asset mix',
+        };
+      }),
   ].slice(0, 3);
 
   const personalTouchpoints = clients
@@ -433,7 +553,13 @@ export default function DashboardPage() {
                   {nextTasks.length === 0 ? (
                     <div className="empty-state"><h3>No pending tasks due this week</h3></div>
                   ) : nextTasks.map((task, index) => (
-                    <div key={task.id} className={`dashboard-task-row ${index === 0 ? 'featured' : ''}`}>
+                    <div
+                      key={task.id}
+                      className={`dashboard-task-row ${index === 0 ? 'featured' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to mark complete"
+                      onClick={() => completeTask(task)}
+                    >
                       <Circle size={18} />
                       <div>
                         <h3>{task.title}</h3>
@@ -442,7 +568,7 @@ export default function DashboardPage() {
                       <span>{task.priority.toUpperCase()}</span>
                     </div>
                   ))}
-                  <p className="xp-note"><Check size={13} /> Tap to complete · earn +10 XP per task</p>
+                  <p className="xp-note"><Check size={13} /> Click a task to complete it · +10 XP each</p>
                 </section>
               </main>
 
@@ -472,17 +598,27 @@ export default function DashboardPage() {
                   <div className="dashboard-card-head">
                     <div className="flex-center gap-8">
                       <h2>Risk & review</h2>
-                      <span>{riskFlags.length} flags</span>
+                      <span>{riskFlags.length} flag{riskFlags.length !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
+                  <p style={{ fontSize: 12, color: 'var(--ink3)', marginBottom: 14, marginTop: -6 }}>
+                    Drift, overdue tasks, and volatility alerts across your book.
+                  </p>
                   {riskFlags.length === 0 ? (
-                    <div className="soft-empty">No active review flags.</div>
+                    <div className="soft-empty" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle size={14} color="var(--accent-green)" /> All clear — no active flags.
+                    </div>
                   ) : riskFlags.map((flag) => (
                     <div key={`${flag.label}-${flag.detail}`} className={`risk-row ${flag.tone}`}>
                       <b />
                       <div>
                         <span>{flag.label}</span>
-                        <p>{flag.detail}</p>
+                        <p style={{ marginTop: 3 }}>{flag.detail}</p>
+                        {flag.action && (
+                          <p style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: 'var(--ink3)', fontStyle: 'italic' }}>
+                            → {flag.action}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}

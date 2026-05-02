@@ -7,7 +7,7 @@ import {
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
-import { Plus, Edit2, Trash2, CheckCircle, Circle } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Circle, ArrowUpRight } from 'lucide-react';
 import { Task, TaskStatus, TaskPriority } from '@/lib/types';
 
 const PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
@@ -27,17 +27,28 @@ const STATUS_META: Record<string, { badge: string; label: string }> = {
   cancelled:   { badge: 'badge-gray',   label: 'Cancelled' },
 };
 
+const relativeDate = (date: Date) => {
+  const now  = new Date();
+  const diff = Math.round((date.getTime() - now.getTime()) / 86400000);
+  if (diff === 0)  return 'Today';
+  if (diff === 1)  return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  if (diff > 1)    return `In ${diff} days`;
+  return `${Math.abs(diff)} days ago`;
+};
+
 export default function TasksPage() {
   const { user } = useAuth();
-  const [tasks, setTasks]           = useState<Task[]>([]);
-  const [filtered, setFiltered]     = useState<Task[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [tasks, setTasks]                   = useState<Task[]>([]);
+  const [filtered, setFiltered]             = useState<Task[]>([]);
+  const [loading, setLoading]               = useState(true);
   const [statusFilter, setStatusFilter]     = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [clientNames, setClientNames]       = useState<Record<string, string>>({});
-  const [open, setOpen]             = useState(false);
-  const [editing, setEditing]       = useState<Task | null>(null);
-  const [form, setForm]             = useState({
+  const [open, setOpen]                     = useState(false);
+  const [editing, setEditing]               = useState<Task | null>(null);
+  const [viewing, setViewing]               = useState<Task | null>(null);
+  const [form, setForm]                     = useState({
     title: '', description: '',
     priority: 'medium' as TaskPriority,
     status:   'pending' as TaskStatus,
@@ -67,6 +78,7 @@ export default function TasksPage() {
           id: d.id, ...d.data(),
           dueDate:   d.data().dueDate?.toDate?.()   || new Date(d.data().dueDate),
           createdAt: d.data().createdAt?.toDate?.() || new Date(),
+          completedAt: d.data().completedAt?.toDate?.() || undefined,
         } as Task))
         .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
       setTasks(items);
@@ -104,6 +116,7 @@ export default function TasksPage() {
       dueDate: (t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate as unknown as string))
         .toISOString().split('T')[0],
     });
+    setViewing(null);
     setOpen(true);
   };
 
@@ -117,7 +130,10 @@ export default function TasksPage() {
     };
     if (editing) {
       const update: Record<string, unknown> = { ...data };
-      if (form.status === 'completed' && editing.status !== 'completed') update.completedAt = new Date();
+      if (form.status === 'completed' && editing.status !== 'completed') {
+        update.completedAt = new Date();
+        window.dispatchEvent(new Event('aurum:xp-updated'));
+      }
       await updateDoc(doc(db, 'tasks', editing.id), update);
     } else {
       await addDoc(collection(db, 'tasks'), { ...data, createdAt: serverTimestamp() });
@@ -135,17 +151,24 @@ export default function TasksPage() {
 
   const quickComplete = async (t: Task) => {
     const db = getClientDb();
-    await updateDoc(doc(db, 'tasks', t.id), { status: 'completed', completedAt: new Date() });
-    load();
+    // Optimistic update
+    setTasks((prev) => prev.map((x) => x.id === t.id ? { ...x, status: 'completed' as TaskStatus } : x));
+    if (viewing?.id === t.id) setViewing((v) => v ? { ...v, status: 'completed' as TaskStatus } : v);
+    window.dispatchEvent(new Event('aurum:xp-updated'));
+    try {
+      await updateDoc(doc(db, 'tasks', t.id), { status: 'completed', completedAt: new Date() });
+    } catch {
+      load(); // Rollback via reload on error
+    }
   };
 
   const set = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
-  const now         = new Date();
-  const pending     = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
-  const overdue     = pending.filter((t) => t.dueDate < now);
-  const dueToday    = pending.filter((t) => t.dueDate.toDateString() === now.toDateString());
-  const completed   = tasks.filter((t) => t.status === 'completed');
+  const now       = new Date();
+  const pending   = tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress');
+  const overdue   = pending.filter((t) => t.dueDate < now);
+  const dueToday  = pending.filter((t) => t.dueDate.toDateString() === now.toDateString());
+  const completed = tasks.filter((t) => t.status === 'completed');
 
   return (
     <AppShell>
@@ -243,6 +266,9 @@ export default function TasksPage() {
                 Clear · {filtered.length} shown
               </button>
             )}
+            <p style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink3)', alignSelf: 'center' }}>
+              Click a row to complete · click the title to view details
+            </p>
           </div>
         </div>
 
@@ -281,15 +307,25 @@ export default function TasksPage() {
                     const isOverdue = t.dueDate < now && t.status !== 'completed' && t.status !== 'cancelled';
                     const isDone    = t.status === 'completed';
                     return (
-                      <tr key={t.id} className={isOverdue ? 'overdue' : ''}>
-                        <td>
+                      <tr
+                        key={t.id}
+                        className={isOverdue ? 'overdue' : ''}
+                        style={{ cursor: isDone ? 'default' : 'pointer' }}
+                        title={isDone ? undefined : 'Click to mark complete'}
+                        onClick={() => { if (!isDone) quickComplete(t); }}
+                      >
+                        {/* Status icon */}
+                        <td onClick={(e) => e.stopPropagation()}>
                           {isDone
                             ? <CheckCircle size={16} color="var(--accent-green)" />
                             : <Circle size={16} color="var(--ink3)" />}
                         </td>
-                        <td>
-                          <div style={{ fontWeight: 600, textDecoration: isDone ? 'line-through' : 'none', opacity: isDone ? 0.55 : 1 }}>
+
+                        {/* Title — click opens detail view */}
+                        <td onClick={(e) => { e.stopPropagation(); setViewing(t); }} style={{ cursor: 'pointer' }}>
+                          <div style={{ fontWeight: 600, textDecoration: isDone ? 'line-through' : 'none', opacity: isDone ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
                             {t.title}
+                            <ArrowUpRight size={12} style={{ opacity: 0.4, flexShrink: 0 }} />
                           </div>
                           {t.description && (
                             <div className="text-secondary" style={{ fontSize: 12, marginTop: 2 }}>
@@ -297,20 +333,21 @@ export default function TasksPage() {
                             </div>
                           )}
                         </td>
-                        <td className="text-secondary">
+
+                        <td className="text-secondary" onClick={(e) => e.stopPropagation()}>
                           {t.clientId ? (clientNames[t.clientId] || '—') : '—'}
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <span className={`badge ${PRIORITY_META[t.priority]?.badge || 'badge-gray'}`}>
                             {PRIORITY_META[t.priority]?.label || t.priority}
                           </span>
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <span className={`badge ${STATUS_META[t.status]?.badge || 'badge-gray'}`}>
                             {STATUS_META[t.status]?.label || t.status}
                           </span>
                         </td>
-                        <td className={isOverdue ? 'text-red' : 'text-secondary'}>
+                        <td className={isOverdue ? 'text-red' : 'text-secondary'} onClick={(e) => e.stopPropagation()}>
                           {(t.dueDate instanceof Date ? t.dueDate : new Date(t.dueDate as unknown as string))
                             .toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           {isOverdue && (
@@ -319,9 +356,9 @@ export default function TasksPage() {
                             </span>
                           )}
                         </td>
-                        <td>
+                        <td onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-8">
-                            {t.status !== 'completed' && (
+                            {!isDone && (
                               <button className="btn-icon" title="Mark complete" onClick={() => quickComplete(t)}>
                                 <CheckCircle size={13} color="var(--accent-green)" />
                               </button>
@@ -343,6 +380,87 @@ export default function TasksPage() {
           </div>
         )}
 
+        {/* ── Task detail modal ── */}
+        {viewing && (
+          <div className="modal-overlay" onClick={() => setViewing(null)}>
+            <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div style={{ flex: 1 }}>
+                  <div className="flex-center gap-8" style={{ marginBottom: 8 }}>
+                    <span className={`badge ${PRIORITY_META[viewing.priority]?.badge || 'badge-gray'}`}>
+                      {PRIORITY_META[viewing.priority]?.label}
+                    </span>
+                    <span className={`badge ${STATUS_META[viewing.status]?.badge || 'badge-gray'}`}>
+                      {STATUS_META[viewing.status]?.label}
+                    </span>
+                    {viewing.dueDate < now && viewing.status !== 'completed' && viewing.status !== 'cancelled' && (
+                      <span className="badge badge-red">Overdue</span>
+                    )}
+                  </div>
+                  <h2 className="modal-title">{viewing.title}</h2>
+                </div>
+                <button className="btn-icon" onClick={() => setViewing(null)}>×</button>
+              </div>
+
+              <div className="modal-body">
+                {viewing.description && (
+                  <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.75, padding: '12px 16px', background: 'rgba(255,255,255,0.60)', borderRadius: 'var(--radius-md)' }}>
+                    {viewing.description}
+                  </p>
+                )}
+
+                <div>
+                  <div className="info-row">
+                    <span className="info-label">Due date</span>
+                    <span className="info-value">
+                      {(viewing.dueDate instanceof Date ? viewing.dueDate : new Date(viewing.dueDate as unknown as string))
+                        .toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      <span className="text-muted" style={{ marginLeft: 8, fontSize: 12 }}>
+                        ({relativeDate(viewing.dueDate instanceof Date ? viewing.dueDate : new Date(viewing.dueDate as unknown as string))})
+                      </span>
+                    </span>
+                  </div>
+                  {viewing.clientId && (
+                    <div className="info-row">
+                      <span className="info-label">Client</span>
+                      <span className="info-value">{clientNames[viewing.clientId] || viewing.clientId}</span>
+                    </div>
+                  )}
+                  <div className="info-row">
+                    <span className="info-label">Created</span>
+                    <span className="info-value">
+                      {(viewing.createdAt instanceof Date ? viewing.createdAt : new Date())
+                        .toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                  </div>
+                  {viewing.status === 'completed' && (viewing as Task & { completedAt?: Date }).completedAt && (
+                    <div className="info-row">
+                      <span className="info-label">Completed</span>
+                      <span className="info-value" style={{ color: 'var(--accent-green)', fontWeight: 600 }}>
+                        {((viewing as Task & { completedAt?: Date }).completedAt as Date)
+                          .toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        &nbsp;· +10 XP
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => openEdit(viewing)}>
+                  <Edit2 size={13} /> Edit
+                </button>
+                {viewing.status !== 'completed' && viewing.status !== 'cancelled' && (
+                  <button className="btn btn-green" onClick={() => quickComplete(viewing)}>
+                    <CheckCircle size={14} /> Mark complete
+                  </button>
+                )}
+                <button className="btn btn-secondary" onClick={() => setViewing(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Add / edit modal ── */}
         {open && (
           <div className="modal-overlay" onClick={() => setOpen(false)}>
@@ -358,7 +476,7 @@ export default function TasksPage() {
                 </div>
                 <div className="field">
                   <label className="label">Description</label>
-                  <textarea className="textarea" value={form.description} onChange={(e) => set('description', e.target.value)} rows={2} placeholder="Optional details…" />
+                  <textarea className="textarea" value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} placeholder="Optional details…" />
                 </div>
                 <div className="form-grid">
                   <div className="field">

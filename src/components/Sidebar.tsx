@@ -51,6 +51,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (!user) return;
+
     const loadGame = async () => {
       const db = getClientDb();
       try {
@@ -84,7 +85,12 @@ export default function Sidebar() {
         setGame({ streak: 0, xp: 0 });
       }
     };
+
     loadGame();
+
+    // Re-fetch whenever a task is completed anywhere in the app
+    window.addEventListener('aurum:xp-updated', loadGame);
+    return () => window.removeEventListener('aurum:xp-updated', loadGame);
   }, [user]);
 
   const handleSignOut = async () => {
