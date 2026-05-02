@@ -45,7 +45,8 @@ export default function MarketPage() {
     try {
       const res = await fetch(`/api/prices?symbols=${encodeURIComponent(ALL_SYMBOLS.join(','))}`);
       if (res.ok) {
-        setQuotes((prev) => ({ ...prev, ...(await res.json()) }));
+        const data = await res.json();
+        setQuotes((prev) => ({ ...prev, ...data }));
         setLastUpdated(new Date());
         setSecondsAgo(0);
         setCountdown(REFRESH_INTERVAL);
@@ -75,7 +76,10 @@ export default function MarketPage() {
     const sym = searchSymbol.trim().toUpperCase();
     try {
       const res = await fetch(`/api/prices?symbols=${encodeURIComponent([sym, `${sym}.NS`, `${sym}.BO`].join(','))}`);
-      if (res.ok) setQuotes((prev) => ({ ...prev, ...(await res.json()) }));
+      if (res.ok) {
+        const data = await res.json();
+        setQuotes((prev) => ({ ...prev, ...data }));
+      }
     } catch {}
     setSearchLoading(false);
   };
