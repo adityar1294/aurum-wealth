@@ -33,6 +33,35 @@ export type InteractionType =
 
 export type DocumentCategory = 'KYC' | 'Agreement' | 'Report' | 'Tax' | 'Other';
 
+export type LeadStage =
+  | 'cold_lead'
+  | 'contacted'
+  | 'meeting_1'
+  | 'meeting_2'
+  | 'interested'
+  | 'agreement_signed'
+  | 'fee_paid'
+  | 'client'
+  | 'considering'
+  | 'not_interested'
+  | 'looking_elsewhere';
+
+export interface Lead {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  source?: string;
+  stage: LeadStage;
+  notes?: string;
+  lookingFor?: string;
+  estimatedValue?: number;
+  rmId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  convertedClientId?: string;
+}
+
 export interface User {
   uid: string;
   email: string;

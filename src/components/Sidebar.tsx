@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   CheckSquare,
   MessageSquare,
   Settings,
@@ -28,6 +29,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/dashboard', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
+  { href: '/leads', icon: <UserPlus size={16} />, label: 'Leads' },
   { href: '/clients', icon: <Users size={16} />, label: 'Clients' },
   { href: '/tasks', icon: <CheckSquare size={16} />, label: 'Tasks' },
   { href: '/interactions', icon: <MessageSquare size={16} />, label: 'Interactions' },

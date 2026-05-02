@@ -26,6 +26,12 @@ import { getClientDb } from '@/lib/firebase';
 import { formatINR } from '@/lib/currency';
 import { decrypt } from '@/lib/encryption';
 
+interface DashboardLead {
+  id: string;
+  stage: string;
+  estimatedValue: number;
+}
+
 interface DashboardClient {
   id: string;
   name: string;
@@ -62,6 +68,7 @@ interface RiskFlag {
   action?: string;
 }
 
+const PIPELINE_STAGES = ['agreement_signed', 'fee_paid'];
 const AUM_TARGET = 365_00_00_000;
 const REVIEW_TARGET_RATIO = 0.62;
 const TOUCHPOINT_TARGET = 15;
@@ -227,6 +234,7 @@ function CalendarCard({ events }: { events: DashboardEvent[] }) {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [clients, setClients] = useState<DashboardClient[]>([]);
+  const [leads, setLeads] = useState<DashboardLead[]>([]);
   const [tasks, setTasks] = useState<DashboardTask[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
   const [interactionsCount, setInteractionsCount] = useState(0);
@@ -270,6 +278,17 @@ export default function DashboardPage() {
             investedAmount: acc.investedAmount + investedAmount,
           };
         }, { currentValue: 0, investedAmount: 0 });
+      }));
+
+      // Load leads for pipeline metric
+      const leadsQ = user.role === 'admin'
+        ? query(collection(db, 'leads'))
+        : query(collection(db, 'leads'), where('rmId', '==', user.uid));
+      const leadsSnap = await getDocs(leadsQ);
+      const leadsData: DashboardLead[] = leadsSnap.docs.map((d) => ({
+        id: d.id,
+        stage: d.data().stage || '',
+        estimatedValue: Number(d.data().estimatedValue || 0),
       }));
 
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
@@ -352,6 +371,7 @@ export default function DashboardPage() {
           investedAmount: values.investedAmount,
         };
       }));
+      setLeads(leadsData);
       setTasks(taskItems);
       setEvents([...calendarEvents, ...interactionEvents]);
       setInteractionsCount(interactionsSnap.size);
@@ -389,7 +409,8 @@ export default function DashboardPage() {
     .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
     .slice(0, 4);
   const meetingsThisMonth = events.filter((event) => event.type === 'meeting' && event.date.getMonth() === now.getMonth()).length;
-  const pipeline = clients.filter((client) => client.currentValue === 0).length * 10_00_00_000;
+  const pipelineLeads = leads.filter((l) => PIPELINE_STAGES.includes(l.stage));
+  const pipeline = pipelineLeads.reduce((s, l) => s + l.estimatedValue, 0);
   const reviewTarget = Math.max(1, Math.ceil(activeClients * REVIEW_TARGET_RATIO));
   const reviewsDone = events.filter((event) => event.type === 'meeting' && event.date >= new Date(now.getFullYear(), now.getMonth(), 1)).length;
   const touchpoints = interactionsCount;
@@ -505,7 +526,7 @@ export default function DashboardPage() {
               <div className="metric-feature metric-pipeline">
                 <span>Pipeline</span>
                 <strong>{pipeline ? `₹${cr(pipeline)}` : '₹0 Cr'}</strong>
-                <small>{clients.filter((c) => c.currentValue === 0).length} leads · {meetingsThisMonth} meetings</small>
+                <small>{pipelineLeads.length} leads · {meetingsThisMonth} meetings</small>
                 <div className="bar-spark">{[28, 42, 31, 50, 40, 58, 52].map((h, i) => <i key={i} style={{ height: `${h}%` }} />)}</div>
               </div>
             </div>
