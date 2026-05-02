@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -11,9 +12,12 @@ import {
   BarChart3,
   TrendingUp,
   Globe,
+  Flame,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getClientDb } from '@/lib/firebase';
 
 interface NavItem {
   href: string;
@@ -32,7 +36,7 @@ const NAV: NavItem[] = [
 const TOOLS: NavItem[] = [
   { href: '/tools/planner', icon: <BarChart3 size={16} />, label: 'Financial Planner' },
   { href: '/tools/portfolio', icon: <TrendingUp size={16} />, label: 'Portfolio Analysis' },
-  { href: '/tools/market', icon: <Globe size={16} />, label: 'Market Research' },
+  { href: '/tools/market', icon: <Globe size={16} />, label: 'Market' },
 ];
 
 const ADMIN: NavItem[] = [
@@ -43,6 +47,45 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [game, setGame] = useState({ streak: 0, xp: 0 });
+
+  useEffect(() => {
+    if (!user) return;
+    const loadGame = async () => {
+      const db = getClientDb();
+      try {
+        const snap = await getDocs(
+          user.role === 'client' && user.clientId
+            ? query(collection(db, 'tasks'), where('clientId', '==', user.clientId), where('status', '==', 'completed'))
+            : user.role === 'admin'
+              ? query(collection(db, 'tasks'), where('status', '==', 'completed'))
+              : query(collection(db, 'tasks'), where('rmId', '==', user.uid), where('status', '==', 'completed'))
+        );
+
+        const completedDays = new Set<string>();
+        snap.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const rawDate = data.completedAt || data.dueDate;
+          const date = rawDate?.toDate?.() || (rawDate ? new Date(rawDate) : null);
+          if (date && !Number.isNaN(date.getTime())) completedDays.add(date.toISOString().slice(0, 10));
+        });
+
+        let streak = 0;
+        const cursor = new Date();
+        for (let i = 0; i < 14; i += 1) {
+          const key = cursor.toISOString().slice(0, 10);
+          if (!completedDays.has(key)) break;
+          streak += 1;
+          cursor.setDate(cursor.getDate() - 1);
+        }
+
+        setGame({ streak, xp: snap.size * 10 });
+      } catch {
+        setGame({ streak: 0, xp: 0 });
+      }
+    };
+    loadGame();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -53,6 +96,9 @@ export default function Sidebar() {
     href === '/dashboard' ? pathname === href : pathname.startsWith(href);
 
   const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
+  const level = Math.max(1, Math.floor(game.xp / 100) + 1);
+  const xpIntoLevel = game.xp % 100;
+  const segmentCount = useMemo(() => Math.max(1, Math.ceil(xpIntoLevel / 20)), [xpIntoLevel]);
 
   return (
     <div className="sidebar">
@@ -122,6 +168,19 @@ export default function Sidebar() {
 
       {/* Footer: user card + sign out */}
       <div className="sidebar-footer">
+        <div className="sidebar-game-card">
+          <div className="sidebar-game-title">
+            <span><Flame size={15} color="var(--yolk)" /> {game.streak || 0}-day streak</span>
+            <b className="sidebar-level">LV {level}</b>
+          </div>
+          <div className="sidebar-segments" aria-label={`${xpIntoLevel} XP to next level progress`}>
+            {Array.from({ length: 5 }).map((_, i) => <i key={i} className={i < segmentCount ? 'on' : ''} />)}
+          </div>
+          <div className="sidebar-xp-copy">
+            <span>{100 - xpIntoLevel} XP to next level</span>
+            <span>{game.xp} XP</span>
+          </div>
+        </div>
         <div className="user-info">
           <div className="user-avatar">{initials}</div>
           <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>

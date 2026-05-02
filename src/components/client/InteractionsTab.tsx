@@ -165,7 +165,7 @@ export default function InteractionsTab({ clientId }: Props) {
             <div className="modal-body">
               <div className="field">
                 <label className="label">Type</label>
-                <select className="select" value={form.type} onChange={(e) => set('type', e.target.value)}>
+                <select className="input" value={form.type} onChange={(e) => set('type', e.target.value)}>
                   {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
