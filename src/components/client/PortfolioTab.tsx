@@ -685,7 +685,7 @@ export default function PortfolioTab({ clientId }: Props) {
               <div className="form-grid">
                 <div className="field" style={{ gridColumn: '1/-1' }}>
                   <label className="label">Asset Type *</label>
-                  <select className="select" value={holdingForm.assetType} onChange={(e) => hf('assetType', e.target.value)}>
+                  <select className="input" value={holdingForm.assetType} onChange={(e) => hf('assetType', e.target.value)}>
                     {ASSET_TYPES.map((t) => <option key={t} value={t}>{ASSET_LABELS[t]}</option>)}
                   </select>
                 </div>
@@ -721,7 +721,7 @@ export default function PortfolioTab({ clientId }: Props) {
                 </div>
                 <div className="field">
                   <label className="label">Currency</label>
-                  <select className="select" value={holdingForm.currency} onChange={(e) => hf('currency', e.target.value)}>
+                  <select className="input" value={holdingForm.currency} onChange={(e) => hf('currency', e.target.value)}>
                     <option value="INR">INR ₹</option>
                     <option value="USD">USD $</option>
                     <option value="EUR">EUR €</option>
@@ -777,7 +777,7 @@ export default function PortfolioTab({ clientId }: Props) {
             <div className="modal-body">
               <div className="field">
                 <label className="label">Transaction Type</label>
-                <select className="select" value={txForm.type} onChange={(e) => tf('type', e.target.value)}>
+                <select className="input" value={txForm.type} onChange={(e) => tf('type', e.target.value)}>
                   {TX_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                 </select>
               </div>

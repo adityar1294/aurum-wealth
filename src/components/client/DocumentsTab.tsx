@@ -110,7 +110,7 @@ export default function DocumentsTab({ clientId }: Props) {
       <div className="flex-between" style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 16, fontWeight: 700 }}>Documents</h2>
         <div className="flex gap-8">
-          <select className="select" style={{ width: 140 }} value={category} onChange={(e) => setCategory(e.target.value as DocumentCategory)}>
+          <select className="input" style={{ width: 140 }} value={category} onChange={(e) => setCategory(e.target.value as DocumentCategory)}>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <button className="btn btn-primary btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>

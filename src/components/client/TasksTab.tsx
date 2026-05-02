@@ -155,13 +155,13 @@ export default function TasksTab({ clientId }: Props) {
               <div className="form-grid">
                 <div className="field">
                   <label className="label">Priority</label>
-                  <select className="select" value={form.priority} onChange={(e) => set('priority', e.target.value)}>
+                  <select className="input" value={form.priority} onChange={(e) => set('priority', e.target.value)}>
                     {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="field">
                   <label className="label">Status</label>
-                  <select className="select" value={form.status} onChange={(e) => set('status', e.target.value)}>
+                  <select className="input" value={form.status} onChange={(e) => set('status', e.target.value)}>
                     {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                   </select>
                 </div>

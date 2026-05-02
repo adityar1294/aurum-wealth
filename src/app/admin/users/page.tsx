@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
                     <td className="text-secondary">{u.email}</td>
                     <td>
                       <select
-                        className="select"
+                        className="input"
                         style={{ width: 120, padding: '4px 8px', fontSize: 13 }}
                         value={u.role}
                         onChange={(e) => changeRole(u.uid, e.target.value as Role)}
@@ -162,7 +162,7 @@ export default function AdminUsersPage() {
                 <div className="field"><label className="label">Password *</label><input className="input" type="password" value={form.password} onChange={(e) => set('password', e.target.value)} placeholder="Min 6 characters" minLength={6} /></div>
                 <div className="field">
                   <label className="label">Role *</label>
-                  <select className="select" value={form.role} onChange={(e) => set('role', e.target.value)}>
+                  <select className="input" value={form.role} onChange={(e) => set('role', e.target.value)}>
                     {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>

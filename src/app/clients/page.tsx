@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
-import { Search, Plus, Filter } from 'lucide-react';
+import { Search, Plus, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import { decrypt } from '@/lib/encryption';
 import { RiskProfile } from '@/lib/types';
@@ -21,6 +21,13 @@ interface ClientRow {
 }
 
 const RISK_PROFILES: RiskProfile[] = ['conservative', 'moderate', 'aggressive', 'very_aggressive'];
+
+const RISK_META: Record<string, { badge: string; card: string; label: string }> = {
+  conservative:   { badge: 'badge-green',  card: 'client-card-green',  label: 'Conservative' },
+  moderate:       { badge: 'badge-blue',   card: 'client-card-blue',   label: 'Moderate' },
+  aggressive:     { badge: 'badge-yellow', card: 'client-card-yellow', label: 'Aggressive' },
+  very_aggressive:{ badge: 'badge-red',    card: 'client-card-dark',   label: 'Very Aggressive' },
+};
 
 export default function ClientsPage() {
   const { user } = useAuth();
@@ -40,7 +47,7 @@ export default function ClientsPage() {
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
-        (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.phone.includes(q)
+        (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.phone.includes(q),
       );
     }
     if (riskFilter) result = result.filter((c) => c.riskProfile === riskFilter);
@@ -78,86 +85,143 @@ export default function ClientsPage() {
     }
   };
 
-  const riskBadge = (r: string) => {
-    const map: Record<string, string> = { conservative: 'badge-green', moderate: 'badge-blue', aggressive: 'badge-yellow', very_aggressive: 'badge-red' };
-    return map[r] || 'badge-gray';
-  };
+  const riskBadge = (r: string) => RISK_META[r]?.badge || 'badge-gray';
 
   return (
     <AppShell>
-      <div className="page">
-        <div className="page-header">
+      <div className="page dashboard-page">
+
+        {/* ── Hero ── */}
+        <div className="dashboard-hero">
           <div>
-            <h1 className="page-title">Clients</h1>
-            <p className="page-subtitle">{filtered.length} client{filtered.length !== 1 ? 's' : ''}</p>
+            <div className="hero-date">Client book</div>
+            <h1>Clients.</h1>
+            <p>your {clients.length} relationships.</p>
           </div>
-          <Link href="/clients/new" className="btn btn-primary">
-            <Plus size={16} /> Add Client
-          </Link>
+          <div className="hero-actions">
+            <Link href="/clients/new" className="btn btn-primary">
+              <Plus size={16} /> New Client
+            </Link>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-12" style={{ marginBottom: 20 }}>
-          <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
-            <Search size={15} color="var(--text-muted)" />
-            <input placeholder="Search by name, email, phone…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <select className="select" style={{ width: 180 }} value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)}>
-            <option value="">All Risk Profiles</option>
-            {RISK_PROFILES.map((r) => (
-              <option key={r} value={r}>{r.replace('_', ' ')}</option>
-            ))}
-          </select>
+        {/* ── Risk profile summary cards ── */}
+        <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 20 }}>
+          {RISK_PROFILES.map((r) => {
+            const count = clients.filter((c) => c.riskProfile === r).length;
+            const meta  = RISK_META[r];
+            const active = riskFilter === r;
+            return (
+              <div
+                key={r}
+                className={`top-client-card ${meta.card}`}
+                style={{ cursor: 'pointer', opacity: riskFilter && !active ? 0.5 : 1 }}
+                onClick={() => setRiskFilter(active ? '' : r)}
+              >
+                <div className="top-client-meta">
+                  <span>{meta.label}</span>
+                  <i style={{ background: active ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)' }}>
+                    <ArrowUpRight size={14} />
+                  </i>
+                </div>
+                <strong style={{ fontSize: 40, letterSpacing: '-0.04em' }}>{count}</strong>
+                <small>{count === 1 ? 'client' : 'clients'}</small>
+              </div>
+            );
+          })}
         </div>
 
+        {/* ── Filter bar ── */}
+        <div className="dashboard-panel" style={{ padding: '14px 20px', marginBottom: 20 }}>
+          <div className="flex flex-wrap gap-12">
+            <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
+              <Search size={15} color="var(--text-muted)" />
+              <input
+                placeholder="Search by name, email, phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="input"
+              style={{ width: 200 }}
+              value={riskFilter}
+              onChange={(e) => setRiskFilter(e.target.value)}
+            >
+              <option value="">All Risk Profiles</option>
+              {RISK_PROFILES.map((r) => (
+                <option key={r} value={r}>{RISK_META[r].label}</option>
+              ))}
+            </select>
+            {(search || riskFilter) && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setSearch(''); setRiskFilter(''); }}
+              >
+                Clear filters · {filtered.length} shown
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Table ── */}
         {loading ? (
           <div className="loading-center"><div className="spinner spinner-lg" /></div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Risk Profile</th>
-                  <th>Tax Slab</th>
-                  <th>Tags</th>
-                  <th>Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <div className="dashboard-panel" style={{ padding: 0 }}>
+            <div className="table-wrap" style={{ borderRadius: 'var(--radius-xl)', boxShadow: 'none', border: 'none', background: 'transparent' }}>
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={7}>
-                      <div className="empty-state">
-                        <h3>No clients found</h3>
-                        <p>Try adjusting your search or add a new client</p>
-                      </div>
-                    </td>
+                    <th>Client</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Risk profile</th>
+                    <th>Tax slab</th>
+                    <th>Tags</th>
+                    <th>Added</th>
                   </tr>
-                ) : filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <Link href={`/clients/${c.id}`} className="flex-center gap-8" style={{ color: 'inherit' }}>
-                        <div className="client-avatar">{(c.name || '?').charAt(0).toUpperCase()}</div>
-                        <span style={{ fontWeight: 600 }}>{c.name || 'Unnamed'}</span>
-                      </Link>
-                    </td>
-                    <td className="text-secondary">{c.email}</td>
-                    <td className="text-secondary">{c.phone}</td>
-                    <td><span className={`badge ${riskBadge(c.riskProfile)}`}>{c.riskProfile.replace('_', ' ')}</span></td>
-                    <td className="text-secondary">{c.taxSlab}</td>
-                    <td>
-                      <div className="flex flex-wrap gap-8">
-                        {c.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}
-                        {c.tags.length > 3 && <span className="text-muted" style={{ fontSize: 12 }}>+{c.tags.length - 3}</span>}
-                      </div>
-                    </td>
-                    <td className="text-secondary">{c.createdAt.toLocaleDateString('en-IN')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7}>
+                        <div className="empty-state">
+                          <h3>No clients found</h3>
+                          <p>Try adjusting your search or add a new client.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filtered.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <Link href={`/clients/${c.id}`} className="flex-center gap-8" style={{ color: 'inherit' }}>
+                          <div className="client-avatar">{(c.name || '?').charAt(0).toUpperCase()}</div>
+                          <span style={{ fontWeight: 600 }}>{c.name || 'Unnamed'}</span>
+                        </Link>
+                      </td>
+                      <td className="text-secondary">{c.email}</td>
+                      <td className="text-secondary">{c.phone}</td>
+                      <td>
+                        <span className={`badge ${riskBadge(c.riskProfile)}`}>
+                          {RISK_META[c.riskProfile]?.label || c.riskProfile}
+                        </span>
+                      </td>
+                      <td className="text-secondary">{c.taxSlab || '—'}</td>
+                      <td>
+                        <div className="flex flex-wrap gap-8">
+                          {c.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}
+                          {c.tags.length > 3 && (
+                            <span className="text-muted" style={{ fontSize: 12 }}>+{c.tags.length - 3}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-secondary">{c.createdAt.toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

@@ -36,7 +36,7 @@ const NAV: NavItem[] = [
 const TOOLS: NavItem[] = [
   { href: '/tools/planner', icon: <BarChart3 size={16} />, label: 'Financial Planner' },
   { href: '/tools/portfolio', icon: <TrendingUp size={16} />, label: 'Portfolio Analysis' },
-  { href: '/tools/market', icon: <Globe size={16} />, label: 'Market Research' },
+  { href: '/tools/market', icon: <Globe size={16} />, label: 'Market' },
 ];
 
 const ADMIN: NavItem[] = [

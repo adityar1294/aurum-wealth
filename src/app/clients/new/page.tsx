@@ -139,7 +139,7 @@ export default function NewClientPage() {
             <div className="form-grid">
               <div className="field">
                 <label className="label">Risk Profile *</label>
-                <select className="select" value={form.riskProfile} onChange={(e) => set('riskProfile', e.target.value)}>
+                <select className="input" value={form.riskProfile} onChange={(e) => set('riskProfile', e.target.value)}>
                   {RISK_PROFILES.map((r) => (
                     <option key={r} value={r}>{r.replace('_', ' ')}</option>
                   ))}
@@ -147,7 +147,7 @@ export default function NewClientPage() {
               </div>
               <div className="field">
                 <label className="label">Tax Slab</label>
-                <select className="select" value={form.taxSlab} onChange={(e) => set('taxSlab', e.target.value)}>
+                <select className="input" value={form.taxSlab} onChange={(e) => set('taxSlab', e.target.value)}>
                   {TAX_SLABS.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -155,7 +155,7 @@ export default function NewClientPage() {
               </div>
               <div className="field">
                 <label className="label">Investment Horizon</label>
-                <select className="select" value={form.investmentHorizon} onChange={(e) => set('investmentHorizon', e.target.value)}>
+                <select className="input" value={form.investmentHorizon} onChange={(e) => set('investmentHorizon', e.target.value)}>
                   {HORIZONS.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}

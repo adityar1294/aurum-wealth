@@ -113,7 +113,7 @@ function CalendarCard({ events }: { events: DashboardEvent[] }) {
     <div className="dashboard-panel calendar-panel">
       <div className="dashboard-card-head">
         <div className="flex-center gap-8">
-          <h2>May</h2>
+          <h2>{MONTHS[today.getMonth()]}</h2>
           <span>{todayEvents.length} item{todayEvents.length !== 1 ? 's' : ''} today</span>
         </div>
         <div className="flex-center gap-8">
